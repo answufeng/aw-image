@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".DemoApp"
+        android:allowBackup="false"
+        android:label="aw-image Demo"
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".BasicLoadActivity" />
+        <activity android:name=".TransformActivity" />
+        <activity android:name=".AdvancedConfigActivity" />
+        <activity android:name=".PreloadActivity" />
+        <activity android:name=".GifActivity" />
+        <activity android:name=".CacheActivity" />
+        <activity android:name=".RecyclerViewActivity" />
+
+    </application>
+</manifest>
