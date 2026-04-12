@@ -1,14 +1,37 @@
-# brick-image consumer ProGuard rules
+# aw-image consumer ProGuard rules
 
-# Public API — keep all public classes and members
--keep class com.ail.brick.image.BrickImage { *; }
--keep class com.ail.brick.image.BrickImage$ImageConfig { *; }
--keep class com.ail.brick.image.ImageLoadConfig { *; }
--keep class com.ail.brick.image.ImagePreloader { *; }
+# Public API classes — only keep public/protected members
+-keep public class com.answufeng.image.AwImage {
+    public *;
+}
+-keep public class com.answufeng.image.AwImage$ImageConfig {
+    public *;
+}
+-keep public class com.answufeng.image.ImageLoadConfig {
+    public *;
+}
+-keep public class com.answufeng.image.ImagePreloader {
+    public *;
+}
 
-# Built-in transformations
--keep class com.ail.brick.image.GrayscaleTransformation { *; }
--keep class com.ail.brick.image.ColorFilterTransformation { *; }
--keep class com.ail.brick.image.BorderTransformation { *; }
--keep class com.ail.brick.image.BlurTransformation { *; }
--keep class com.ail.brick.image.ImagePreloader { *; }
+# Built-in transformations — public API
+-keep public class com.answufeng.image.GrayscaleTransformation {
+    public *;
+}
+-keep public class com.answufeng.image.ColorFilterTransformation {
+    public *;
+}
+-keep public class com.answufeng.image.BorderTransformation {
+    public *;
+}
+-keep public class com.answufeng.image.BlurTransformation {
+    public *;
+}
+
+# Extension functions (compiled to static methods in ImageExtKt)
+-keepclassmembers class com.answufeng.image.ImageExtKt {
+    public static ** loadImage(...);
+    public static ** loadCircle(...);
+    public static ** loadRounded(...);
+    public static ** loadBlur(...);
+}

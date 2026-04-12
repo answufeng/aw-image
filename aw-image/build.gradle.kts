@@ -38,6 +38,8 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.annotation)
     implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.coroutines.core)
+    implementation(libs.coroutines.android)
 
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.14.1")

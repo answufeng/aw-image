@@ -10,6 +10,7 @@ class DemoApp : Application() {
             memoryCacheSize(0.25)
             diskCacheSize(256L * 1024 * 1024)
             enableGif(true)
+            enableLogging(true)
         }
     }
 }

@@ -2,10 +2,6 @@
 # Android Gradle Plugin & Kotlin
 agp = "8.7.3"
 kotlin = "2.0.21"
-ksp = "2.0.21-1.0.28"
-
-# 依赖注入
-hilt = "2.52"
 
 # 网络
 okhttp = "4.12.0"
@@ -54,10 +50,6 @@ okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-i
 # ---------- Retrofit ----------
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
-
-# ---------- Hilt ----------
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
-hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 
 # ---------- Coroutines ----------
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -114,5 +106,3 @@ fragment-testing = { group = "androidx.fragment", name = "fragment-testing", ver
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }

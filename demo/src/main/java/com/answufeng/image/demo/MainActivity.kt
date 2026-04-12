@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity() {
             "Basic Load" to BasicLoadActivity::class.java,
             "Transformations" to TransformActivity::class.java,
             "Advanced Config" to AdvancedConfigActivity::class.java,
+            "Error Handling & Fallback" to ErrorHandlingActivity::class.java,
             "Preload" to PreloadActivity::class.java,
             "GIF" to GifActivity::class.java,
             "Cache Management" to CacheActivity::class.java,

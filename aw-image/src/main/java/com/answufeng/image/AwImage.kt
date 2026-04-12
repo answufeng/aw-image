@@ -8,76 +8,80 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import java.io.File
 
 /**
- * Brick 图片加载库全局配置入口。
+ * aw-image 图片加载库全局配置入口。
  *
- * 基于 [Coil] 封装，提供统一的缓存配置、GIF 支持和全局占位图。
+ * 通过 [init] 方法初始化全局 ImageLoader，设置缓存策略、占位图、GIF 支持等。
+ * 未调用 [init] 时，Coil 将使用默认 ImageLoader。
  *
- * ### 零配置使用
- * 无需调用 [init]，所有加载 API 均可直接使用（采用 Coil 默认 ImageLoader）：
  * ```kotlin
- * imageView.loadImage("https://example.com/photo.jpg")
- * ```
- *
- * ### 自定义配置（可选，推荐在 Application.onCreate）
- * ```kotlin
- * AwImage.init(this) {
- *     memoryCacheSize(0.25)               // 25% 可用内存
- *     diskCacheSize(100L * 1024 * 1024)   // 100MB 磁盘缓存
- *     enableGif(true)
- *     placeholder(R.drawable.placeholder)
- *     error(R.drawable.error)
+ * class App : Application() {
+ *     override fun onCreate() {
+ *         super.onCreate()
+ *         AwImage.init(this) {
+ *             memoryCacheSize(0.25)
+ *             diskCacheSize(256L * 1024 * 1024)
+ *             enableGif(true)
+ *             placeholder(R.drawable.placeholder)
+ *             error(R.drawable.error)
+ *             enableLogging(BuildConfig.DEBUG)
+ *         }
+ *     }
  * }
- * ```
- *
- * ### 缓存管理
- * ```kotlin
- * AwImage.clearMemoryCache(context)
- * AwImage.clearDiskCache(context)
  * ```
  */
 object AwImage {
 
-    /** 全局占位图资源 ID（0 表示不设置） */
+    /** 全局占位图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
     internal var globalPlaceholder: Int = 0
         private set
 
-    /** 全局错误图资源 ID（0 表示不设置） */
+    /** 全局错误图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
     internal var globalError: Int = 0
         private set
 
-    /** 是否已显式调用 [init] */
     private var initialized = false
 
+    /** 是否已调用 [init] */
+    val isInitialized: Boolean get() = initialized
+
     /**
-     * 初始化图片加载引擎（可选）。
+     * 初始化全局 ImageLoader。
      *
-     * 如果不调用此方法，库将使用 Coil 的默认 ImageLoader，
-     * 所有加载 API 仍可正常工作，但不享受自定义缓存大小、GIF、全局占位图等配置。
+     * 建议在 [Application.onCreate] 中调用。多次调用会覆盖之前的配置。
      *
-     * 重复调用会覆盖之前的配置。
-     *
-     * @param context 任意 Context（内部自动取 applicationContext）
+     * @param context 任意 Context，内部会转为 ApplicationContext
      * @param config  可选的 DSL 配置块
      */
     fun init(context: Context, config: (ImageConfig.() -> Unit)? = null) {
         val appContext = context.applicationContext
         val imageConfig = ImageConfig().apply { config?.invoke(this) }
 
+        AwLogger.d("AwImage.init: memoryCache=${imageConfig.memoryCachePercent}, " +
+                "diskCache=${imageConfig.diskCacheSize}, gif=${imageConfig.gifEnabled}")
+
         val builder = ImageLoader.Builder(appContext)
-            .crossfade(imageConfig.crossfadeEnabled)
-            .crossfade(imageConfig.crossfadeDuration)
+
+        if (imageConfig.crossfadeEnabled) {
+            builder.crossfade(imageConfig.crossfadeDuration)
+        }
 
         builder.memoryCache {
-            MemoryCache.Builder(appContext)
-                .maxSizePercent(imageConfig.memoryCachePercent)
-                .build()
+            val memBuilder = MemoryCache.Builder(appContext)
+            val maxBytes = imageConfig.memoryCacheMaxBytes
+            if (maxBytes != null) {
+                memBuilder.maxSizeBytes(maxBytes.toInt())
+            } else {
+                memBuilder.maxSizePercent(imageConfig.memoryCachePercent)
+            }
+            memBuilder.build()
         }
 
         builder.diskCache {
             DiskCache.Builder()
-                .directory(appContext.cacheDir.resolve("aw_image_cache"))
+                .directory(imageConfig.diskCacheDir ?: appContext.cacheDir.resolve("aw_image_cache"))
                 .maxSizeBytes(imageConfig.diskCacheSize)
                 .build()
         }
@@ -97,51 +101,120 @@ object AwImage {
 
         Coil.setImageLoader(builder.build())
         initialized = true
+        AwLogger.d("AwImage.init: complete")
     }
 
-    /** 是否已显式初始化 */
-    val isInitialized: Boolean get() = initialized
-
-    /** 获取当前全局 [ImageLoader] 实例 */
+    /** 获取当前 ImageLoader 实例 */
     fun imageLoader(context: Context): ImageLoader = Coil.imageLoader(context)
 
-    /** 清除内存缓存 */
-    fun clearMemoryCache(context: Context) {
-        imageLoader(context).memoryCache?.clear()
-    }
-
-    /** 清除磁盘缓存 */
-    @OptIn(coil.annotation.ExperimentalCoilApi::class)
-    fun clearDiskCache(context: Context) {
-        imageLoader(context).diskCache?.clear()
+    /**
+     * 清除内存缓存。
+     *
+     * 内置异常保护，操作失败不会崩溃。
+     *
+     * @return `true` 表示清除成功，`false` 表示失败
+     */
+    fun clearMemoryCache(context: Context): Boolean {
+        return runCatching {
+            imageLoader(context).memoryCache?.clear()
+            AwLogger.d("clearMemoryCache: success")
+        }.onFailure {
+            AwLogger.e("clearMemoryCache: failed", it)
+        }.isSuccess
     }
 
     /**
-     * 图片加载 DSL 配置。
+     * 清除磁盘缓存。
      *
-     * | 属性 | 说明 | 默认值 |
-     * |---|---|---|
-     * | memoryCachePercent | 内存缓存占可用内存比例 | 0.25 |
-     * | diskCacheSize | 磁盘缓存上限（字节） | 100MB |
-     * | crossfadeEnabled | 是否开启渐入动画 | true |
-     * | crossfadeDuration | 渐入动画时长（ms） | 200 |
-     * | gifEnabled | 是否支持 GIF | true |
-     * | placeholderRes | 全局占位图资源 | 0（不设置） |
-     * | errorRes | 全局错误图资源 | 0（不设置） |
+     * 内置异常保护，操作失败不会崩溃。
+     *
+     * @return `true` 表示清除成功，`false` 表示失败
+     */
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
+    fun clearDiskCache(context: Context): Boolean {
+        return runCatching {
+            imageLoader(context).diskCache?.clear()
+            AwLogger.d("clearDiskCache: success")
+        }.onFailure {
+            AwLogger.e("clearDiskCache: failed", it)
+        }.isSuccess
+    }
+
+    /**
+     * 全局配置 DSL 类。
+     *
+     * 所有属性通过 setter 方法设置，外部不可直接赋值。
      */
     class ImageConfig {
+        /** 内存缓存占应用可用内存的比例（0.05~0.5） */
         var memoryCachePercent: Double = 0.25
-        var diskCacheSize: Long = 100L * 1024 * 1024
-        var crossfadeEnabled: Boolean = true
-        var crossfadeDuration: Int = 200
-        var gifEnabled: Boolean = true
-        var placeholderRes: Int = 0
-        var errorRes: Int = 0
+            private set
 
+        @Suppress("ktlint")
+        internal var memoryCacheMaxBytes: Long? = null
+            private set
+
+        /** 磁盘缓存最大字节数 */
+        var diskCacheSize: Long = 100L * 1024 * 1024
+            private set
+
+        @Suppress("ktlint")
+        internal var diskCacheDir: File? = null
+            private set
+
+        /** 是否启用全局渐入动画 */
+        var crossfadeEnabled: Boolean = true
+            private set
+
+        /** 全局渐入动画时长（ms） */
+        var crossfadeDuration: Int = 200
+            private set
+
+        /** 是否启用 GIF 解码 */
+        var gifEnabled: Boolean = true
+            private set
+
+        /** 全局占位图资源 ID */
+        var placeholderRes: Int = 0
+            private set
+
+        /** 全局错误图资源 ID */
+        var errorRes: Int = 0
+            private set
+
+        /** 按比例设置内存缓存大小（0.05~0.5） */
         fun memoryCacheSize(percent: Double) { memoryCachePercent = percent.coerceIn(0.05, 0.5) }
+
+        /** 按字节数设置内存缓存大小（优先级高于 [memoryCacheSize]） */
+        fun memoryCacheMaxSize(bytes: Long) {
+            memoryCacheMaxBytes = bytes.coerceAtLeast(0)
+        }
+
+        /** 设置磁盘缓存最大字节数 */
         fun diskCacheSize(bytes: Long) { diskCacheSize = bytes.coerceAtLeast(0) }
+
+        /** 设置磁盘缓存目录（默认 `{cacheDir}/aw_image_cache`） */
+        fun diskCacheDir(directory: File) { diskCacheDir = directory }
+
+        /** 设置是否启用全局渐入动画 */
+        fun crossfade(enabled: Boolean) { crossfadeEnabled = enabled }
+
+        /** 设置全局渐入动画时长（ms），同时自动启用渐入动画 */
+        fun crossfade(durationMs: Int) {
+            crossfadeDuration = durationMs.coerceAtLeast(0)
+            if (durationMs > 0) crossfadeEnabled = true
+        }
+
+        /** 设置是否启用 GIF 解码 */
         fun enableGif(enabled: Boolean) { gifEnabled = enabled }
+
+        /** 设置全局占位图 */
         fun placeholder(res: Int) { placeholderRes = res }
+
+        /** 设置全局错误图 */
         fun error(res: Int) { errorRes = res }
+
+        /** 设置是否启用调试日志（默认 false） */
+        fun enableLogging(enabled: Boolean) { AwLogger.enabled = enabled }
     }
 }

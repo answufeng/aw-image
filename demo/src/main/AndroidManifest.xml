@@ -25,6 +25,7 @@
         <activity android:name=".GifActivity" />
         <activity android:name=".CacheActivity" />
         <activity android:name=".RecyclerViewActivity" />
+        <activity android:name=".ErrorHandlingActivity" />
 
     </application>
 </manifest>

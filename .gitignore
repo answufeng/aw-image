@@ -49,6 +49,9 @@ captures/
 # Maven local
 .m2/
 
+# Trae IDE
+.trae/
+
 # Temp files
 *.swp
 *.swo

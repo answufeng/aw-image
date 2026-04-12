@@ -9,40 +9,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 
 /**
- * 图片预加载工具，在协程中提前将图片缓存到内存/磁盘。
+ * 图片预加载器——在后台提前加载图片到缓存，后续显示时直接读取。
  *
- * ### 单张预加载
  * ```kotlin
- * lifecycleScope.launch {
- *     ImagePreloader.preload(context, "https://example.com/big.jpg")
- * }
- * ```
+ * // 预加载单张
+ * val success = ImagePreloader.preload(context, url)
  *
- * ### 获取 Drawable
- * ```kotlin
+ * // 批量预加载（并发可控）
+ * ImagePreloader.preloadAll(context, urls, concurrency = 8)
+ *
+ * // 获取已缓存的 Drawable
  * val drawable = ImagePreloader.get(context, url)
- * imageView.setImageDrawable(drawable)
- * ```
- *
- * ### 批量预加载
- * ```kotlin
- * ImagePreloader.preloadAll(context, imageUrls)
  * ```
  */
 object ImagePreloader {
 
     /**
-     * 预加载图片到缓存（不返回 Drawable）。
+     * 预加载单张图片到磁盘/内存缓存。
      *
-     * 使用 [execute] 而非 [enqueue] 以确保协程完成前图片已缓存。
-     * 内部捕获异常，加载失败时返回 `false` 而非抛出异常。
+     * 在 IO 线程执行，内置异常保护。
      *
-     * @param context 上下文
-     * @param data    图片数据源（URL / File / Uri 等）
-     * @return 预加载成功返回 `true`，失败返回 `false`
+     * @param context Context
+     * @param data    图片数据源（URL / File / @DrawableRes 等）
+     * @return `true` 加载成功，`false` 加载失败或异常
      */
     suspend fun preload(context: Context, data: Any): Boolean {
         return withContext(Dispatchers.IO) {
@@ -50,20 +43,24 @@ object ImagePreloader {
                 val request = ImageRequest.Builder(context)
                     .data(data)
                     .build()
-                Coil.imageLoader(context).execute(request)
-            }.isSuccess
+                val result = Coil.imageLoader(context).execute(request)
+                val success = result is SuccessResult
+                AwLogger.d("preload: data=$data, success=$success")
+                success
+            }.onFailure {
+                AwLogger.e("preload: failed for data=$data", it)
+            }.getOrDefault(false)
         }
     }
 
     /**
-     * 预加载并返回 [Drawable]。
+     * 获取已缓存的图片 [Drawable]。
      *
-     * 使用 `allowHardware(false)` 以保证返回的 Bitmap 可被 Canvas 使用。
-     * 内部捕获异常，加载失败或发生异常时均返回 `null`。
+     * 如果图片未缓存，会同步加载。在 IO 线程执行。
      *
-     * @param context 上下文
+     * @param context Context
      * @param data    图片数据源
-     * @return 加载成功返回 Drawable，失败返回 `null`
+     * @return [Drawable]，加载失败返回 null
      */
     suspend fun get(context: Context, data: Any): Drawable? {
         return withContext(Dispatchers.IO) {
@@ -74,25 +71,42 @@ object ImagePreloader {
                     .build()
                 val result = Coil.imageLoader(context).execute(request)
                 (result as? SuccessResult)?.drawable
+            }.onFailure {
+                AwLogger.e("get: failed for data=$data", it)
             }.getOrNull()
         }
     }
 
     /**
-     * 批量并行预加载多张图片。
+     * 批量预加载图片，使用 [Semaphore] 控制并发数。
      *
-     * 使用 [coroutineScope] + [async] 并发执行，单张失败不影响其他图片。
+     * ```kotlin
+     * lifecycleScope.launch {
+     *     ImagePreloader.preloadAll(context, urls, concurrency = 8)
+     * }
+     * ```
      *
-     * @param context 上下文
-     * @param urls    图片数据源列表
+     * @param context     Context
+     * @param urls        图片数据源列表
+     * @param concurrency 最大并发数（默认 8，必须 >= 1）
+     * @throws IllegalArgumentException 如果 [concurrency] < 1
      */
-    suspend fun preloadAll(context: Context, urls: List<Any>) {
+    suspend fun preloadAll(context: Context, urls: List<Any>, concurrency: Int = 8) {
+        require(concurrency >= 1) { "concurrency must be >= 1, got $concurrency" }
+        AwLogger.d("preloadAll: ${urls.size} URLs, concurrency=$concurrency")
+        val semaphore = Semaphore(concurrency)
         coroutineScope {
             urls.map { url ->
                 async {
-                    runCatching { preload(context, url) }
+                    semaphore.acquire()
+                    try {
+                        runCatching { preload(context, url) }
+                    } finally {
+                        semaphore.release()
+                    }
                 }
             }.awaitAll()
         }
+        AwLogger.d("preloadAll: complete")
     }
 }
