@@ -46,4 +46,4 @@ dependencies {
     testImplementation("androidx.test:core-ktx:1.6.1")
 }
 
-apply(from = "${rootDir}/gradle/publish.gradle")
+apply(from = "${rootDir}/gradle/publish.gradle.kts")

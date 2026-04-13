@@ -157,24 +157,6 @@ imageView.loadImage(url) {
 | coil-gif | 2.7.0 | GIF 解码支持 |
 | kotlinx-coroutines | 1.9.0 | 协程支持（预加载并发控制） |
 
-## 🤝 贡献
+## 许可证
 
-欢迎贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详情。
-
-## 📄 License
-
-```
-Copyright 2024-2025 answufeng
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
+Apache License 2.0，详见 [LICENSE](LICENSE)。
