@@ -4,7 +4,7 @@
 
 基于 Coil 封装的 Android 图片加载库，提供简洁的 DSL API、常用变换和预加载支持。
 
-## ✨ 功能特性
+## 特性
 
 - **零配置**：无需初始化即可使用
 - **DSL API**：`loadImage` / `loadCircle` / `loadRounded` / `loadBlur`
@@ -17,7 +17,7 @@
 - **日志调试**：可选日志输出，方便排查问题
 - **自定义磁盘缓存目录**：支持指定缓存路径
 
-## 📦 引入方式
+## 引入
 
 ```kotlin
 // settings.gradle.kts
@@ -35,7 +35,7 @@ dependencies {
 
 > Coil 以 `api` 方式传递，无需额外声明。
 
-## 🚀 快速开始
+## 快速开始
 
 ### 零配置使用
 
@@ -65,7 +65,7 @@ class App : Application() {
 }
 ```
 
-## 📖 DSL 配置
+## DSL 配置
 
 ```kotlin
 imageView.loadImage(url) {
@@ -90,7 +90,7 @@ imageView.loadImage(url) {
 }
 ```
 
-## 🎨 内置变换
+## 内置变换
 
 | 变换 | 说明 |
 |------|------|
@@ -99,7 +99,7 @@ imageView.loadImage(url) {
 | `BorderTransformation(width, color, circle)` | 边框（支持圆形） |
 | `BlurTransformation(radius, sampling)` | 高斯模糊（API 31+ 使用 RenderEffect 硬件加速） |
 
-## 📡 预加载
+## 预加载
 
 ```kotlin
 lifecycleScope.launch {
@@ -111,7 +111,7 @@ lifecycleScope.launch {
 
 > `preloadAll` 默认并发数为 8，可通过 `concurrency` 参数调整。
 
-## 🗑️ 缓存管理
+## 缓存管理
 
 ```kotlin
 val memoryCleared = AwImage.clearMemoryCache(context)
@@ -120,7 +120,7 @@ val diskCleared = AwImage.clearDiskCache(context)
 
 > 缓存清理方法内置异常保护，返回 `Boolean` 表示操作是否成功。
 
-## 📶 离线智能缓存
+## 离线智能缓存
 
 默认开启：当设备无网络连接时，自动禁用网络请求，仅从内存/磁盘缓存读取图片。
 避免在弱网或离线环境下显示错误图，提升用户体验。
@@ -135,7 +135,7 @@ imageView.loadImage(url) {
 }
 ```
 
-## ⚙️ 全局配置项
+## 全局配置项
 
 | 配置 | 方法 | 默认值 |
 |------|------|--------|
@@ -149,7 +149,7 @@ imageView.loadImage(url) {
 | 全局错误图 | `error(resId)` | 0 (不设置) |
 | 调试日志 | `enableLogging(enabled)` | false |
 
-## 📋 依赖说明
+## 依赖说明
 
 | 依赖 | 版本 | 用途 |
 |------|------|------|
