@@ -43,8 +43,8 @@ dependencies {
     implementation(libs.coroutines.android)
 
     testImplementation(libs.junit)
-    testImplementation("org.robolectric:robolectric:4.14.1")
-    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp)
 }
 
