@@ -32,7 +32,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.answufeng:aw-image:1.1.0")
+    implementation("com.github.answufeng:aw-image:1.0.0")
 }
 ```
 
