@@ -1,20 +1,18 @@
 # aw-image consumer ProGuard rules
 
-# Public API classes — only keep public/protected members
 -keep public class com.answufeng.image.AwImage {
     public *;
 }
 -keep public class com.answufeng.image.AwImage$ImageConfig {
     public *;
 }
--keep public class com.answufeng.image.ImageLoadConfig {
+-keep public class com.answufeng.image.AwImageScope {
     public *;
 }
 -keep public class com.answufeng.image.ImagePreloader {
     public *;
 }
 
-# Built-in transformations — public API
 -keep public class com.answufeng.image.GrayscaleTransformation {
     public *;
 }
@@ -28,7 +26,6 @@
     public *;
 }
 
-# Extension functions (compiled to static methods in ImageExtKt)
 -keepclassmembers class com.answufeng.image.ImageExtKt {
     public static ** loadImage(...);
     public static ** loadCircle(...);

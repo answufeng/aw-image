@@ -7,7 +7,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.answufeng.image.AwImage
 import com.answufeng.image.ImagePreloader
 import com.answufeng.image.loadImage
 import kotlinx.coroutines.launch
@@ -44,8 +43,9 @@ class PreloadActivity : AppCompatActivity() {
             val success = ImagePreloader.preload(this@PreloadActivity, urls.first())
             tvStatus.text = "Preload result: $success"
 
-            ImagePreloader.preloadAll(this@PreloadActivity, urls)
-            tvStatus.append("\nBatch preload complete!")
+            val results = ImagePreloader.preloadAll(this@PreloadActivity, urls)
+            val successCount = results.count { it }
+            tvStatus.append("\nBatch preload complete: $successCount/${urls.size} succeeded")
         }
 
         scrollView.addView(layout)

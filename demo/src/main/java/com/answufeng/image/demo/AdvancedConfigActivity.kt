@@ -1,5 +1,7 @@
 package com.answufeng.image.demo
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -22,17 +24,25 @@ class AdvancedConfigActivity : AppCompatActivity() {
 
         val url = "https://picsum.photos/200/200"
 
-        layout.addView(TextView(this).apply { text = "Custom placeholder + error + listener:" })
+        layout.addView(TextView(this).apply { text = "Drawable placeholder + listener:" })
         layout.addView(ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(200, 200)
             loadImage(url) {
+                placeholder(ColorDrawable(Color.parseColor("#FFE0E0E0")))
+                error(ColorDrawable(Color.parseColor("#FFFFCDD2")))
                 crossfade(500)
                 override(200, 200)
-                listener(
-                    onStart = { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading started..." }) },
-                    onSuccess = { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading succeeded!" }) },
-                    onError = { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading failed!" }) }
-                )
+                onStart { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading started..." }) }
+                onSuccess { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading succeeded!" }) }
+                onError { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading failed!" }) }
+            }
+        })
+
+        layout.addView(TextView(this).apply { text = "\nDrawable fallback (null data):" })
+        layout.addView(ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(200, 200)
+            loadImage(null) {
+                fallback(ColorDrawable(Color.parseColor("#FFBDBDBD")))
             }
         })
 
@@ -46,6 +56,12 @@ class AdvancedConfigActivity : AppCompatActivity() {
         layout.addView(ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(200, 200)
             loadImage(url) { override(100, 100) }
+        })
+
+        layout.addView(TextView(this).apply { text = "\nCrossfade disabled:" })
+        layout.addView(ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(200, 200)
+            loadImage(url) { crossfade(false) }
         })
 
         scrollView.addView(layout)

@@ -34,6 +34,7 @@ android {
 dependencies {
     api(libs.coil)
     api(libs.coil.gif)
+    api(libs.okhttp)
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
     implementation(libs.annotation)
@@ -44,6 +45,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation(libs.okhttp)
 }
 
 apply(from = "${rootDir}/gradle/publish.gradle.kts")

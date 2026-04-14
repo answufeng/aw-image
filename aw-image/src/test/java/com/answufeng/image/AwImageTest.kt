@@ -14,9 +14,12 @@ class AwImageTest {
         assertEquals(200, config.crossfadeDuration)
         assertTrue(config.gifEnabled)
         assertEquals(0, config.placeholderRes)
+        assertNull(config.placeholderDrawable)
         assertEquals(0, config.errorRes)
+        assertNull(config.errorDrawable)
         assertNull(config.memoryCacheMaxBytes)
         assertNull(config.diskCacheDir)
+        assertNull(config.okHttpClient)
     }
 
     @Test
@@ -48,12 +51,22 @@ class AwImageTest {
     }
 
     @Test
-    fun `ImageConfig placeholder and error setters`() {
+    fun `ImageConfig placeholder and error setters with resId`() {
         val config = AwImage.ImageConfig()
         config.placeholder(123)
         assertEquals(123, config.placeholderRes)
         config.error(456)
         assertEquals(456, config.errorRes)
+    }
+
+    @Test
+    fun `ImageConfig placeholder and error setters with Drawable`() {
+        val config = AwImage.ImageConfig()
+        val drawable = android.graphics.drawable.ColorDrawable(0xFF000000.toInt())
+        config.placeholder(drawable)
+        assertEquals(drawable, config.placeholderDrawable)
+        config.error(drawable)
+        assertEquals(drawable, config.errorDrawable)
     }
 
     @Test
@@ -78,6 +91,14 @@ class AwImageTest {
     }
 
     @Test
+    fun `ImageConfig okHttpClient setter`() {
+        val config = AwImage.ImageConfig()
+        val client = okhttp3.OkHttpClient.Builder().build()
+        config.okHttpClient(client)
+        assertEquals(client, config.okHttpClient)
+    }
+
+    @Test
     fun `isInitialized defaults to false`() {
         assertFalse(AwImage.isInitialized)
     }
@@ -86,5 +107,11 @@ class AwImageTest {
     fun `globalPlaceholder and globalError default to 0`() {
         assertEquals(0, AwImage.globalPlaceholder)
         assertEquals(0, AwImage.globalError)
+    }
+
+    @Test
+    fun `globalPlaceholderDrawable and globalErrorDrawable default to null`() {
+        assertNull(AwImage.globalPlaceholderDrawable)
+        assertNull(AwImage.globalErrorDrawable)
     }
 }

@@ -1,6 +1,7 @@
 package com.answufeng.image
 
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.widget.ImageView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -40,6 +41,15 @@ class AwImageInstrumentedTest {
     }
 
     @Test
+    fun init_withDrawablePlaceholder_doesNotCrash() {
+        AwImage.init(context) {
+            placeholder(ColorDrawable(Color.GRAY))
+            error(ColorDrawable(Color.RED))
+        }
+        assertTrue(AwImage.isInitialized)
+    }
+
+    @Test
     fun clearMemoryCache_returnsTrue() {
         AwImage.init(context)
         val result = AwImage.clearMemoryCache(context)
@@ -67,6 +77,15 @@ class AwImageInstrumentedTest {
         val imageView = ImageView(context)
         imageView.loadImage(null) {
             fallback(android.R.drawable.ic_menu_gallery)
+        }
+    }
+
+    @Test
+    fun loadImage_withNullAndDrawableFallback_showsFallback() {
+        AwImage.init(context)
+        val imageView = ImageView(context)
+        imageView.loadImage(null) {
+            fallback(ColorDrawable(Color.GRAY))
         }
     }
 

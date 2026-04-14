@@ -11,9 +11,13 @@ core-ktx = "1.15.0"
 appcompat = "1.7.0"
 lifecycle = "2.8.7"
 annotation = "1.9.1"
+material = "1.12.0"
+constraintlayout = "2.2.0"
+recyclerview = "1.4.0"
 
 # 图片加载
 coil = "2.7.0"
+okhttp = "4.12.0"
 
 # ========================================
 # [libraries]
@@ -29,10 +33,14 @@ core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
 
 # ---------- Coil ----------
 coil = { group = "io.coil-kt", name = "coil", version.ref = "coil" }
 coil-gif = { group = "io.coil-kt", name = "coil-gif", version.ref = "coil" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 # ---------- Test ----------
 junit = { group = "junit", name = "junit", version = "4.13.2" }

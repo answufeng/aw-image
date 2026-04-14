@@ -1,6 +1,7 @@
 package com.answufeng.image.demo
 
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.widget.ImageView
 import android.widget.TextView
@@ -22,26 +23,23 @@ class ErrorHandlingActivity : AppCompatActivity() {
         val ivValid = findViewById<ImageView>(R.id.ivValid)
         ivValid.loadImage(validUrl) {
             crossfade(300)
-            listener(
-                onStart = { tvValidStatus.text = "Status: Loading..." },
-                onSuccess = { tvValidStatus.text = "Status: Success!" },
-                onError = { tvValidStatus.text = "Status: Failed - ${it.throwable.message}" }
-            )
+            onStart { tvValidStatus.text = "Status: Loading..." }
+            onSuccess { tvValidStatus.text = "Status: Success!" }
+            onError { tvValidStatus.text = "Status: Failed - ${it.throwable.message}" }
         }
 
         val tvErrorStatus = findViewById<TextView>(R.id.tvErrorStatus)
         val ivError = findViewById<ImageView>(R.id.ivError)
         ivError.loadImage(invalidUrl) {
-            listener(
-                onStart = { tvErrorStatus.text = "Status: Loading..." },
-                onSuccess = { tvErrorStatus.text = "Status: Success!" },
-                onError = { tvErrorStatus.text = "Status: Failed (expected)" }
-            )
+            error(ColorDrawable(Color.parseColor("#FFFFCDD2")))
+            onStart { tvErrorStatus.text = "Status: Loading..." }
+            onSuccess { tvErrorStatus.text = "Status: Success!" }
+            onError { tvErrorStatus.text = "Status: Failed (expected)" }
         }
 
         val ivFallback = findViewById<ImageView>(R.id.ivFallback)
         ivFallback.loadImage(null) {
-            fallback(android.R.drawable.ic_menu_gallery)
+            fallback(ColorDrawable(Color.parseColor("#FFBDBDBD")))
         }
 
         val ivCircleError = findViewById<ImageView>(R.id.ivCircleError)

@@ -1,5 +1,6 @@
 package com.answufeng.image
 
+import android.graphics.drawable.Drawable
 import android.widget.ImageView
 import coil.load
 import coil.request.CachePolicy
@@ -19,6 +20,216 @@ private val EMPTY_DISPOSABLE = object : Disposable {
 }
 
 /**
+ * [loadImage] 的 DSL 作用域，直接操作 Coil 的 [ImageRequest.Builder]。
+ *
+ * 相比旧版 `ImageLoadConfig`，`AwImageScope` 不创建中间配置对象，
+ * 而是将 DSL 配置直接映射到 Coil Builder，减少对象分配。
+ *
+ * ```kotlin
+ * imageView.loadImage(url) {
+ *     placeholder(R.drawable.loading)
+ *     error(R.drawable.fail)
+ *     fallback(ColorDrawable(Color.GRAY))
+ *     circle()
+ *     crossfade(300)
+ *     noCache()
+ *     transform(GrayscaleTransformation())
+ *     onStart { showProgress() }
+ *     onSuccess { result -> hideProgress() }
+ *     onError { result -> showRetry() }
+ * }
+ * ```
+ */
+class AwImageScope internal constructor(private val builder: ImageRequest.Builder) {
+
+    private val transforms = mutableListOf<Transformation>()
+    private var circleEnabled = false
+    private var roundedRadius: FloatArray? = null
+    private var cacheOnlyOnOffline = true
+    private var cacheDisabled = false
+    private var crossfadeExplicitlySet = false
+
+    internal var fallbackResId: Int = 0
+        private set
+    internal var fallbackDrawable: Drawable? = null
+        private set
+
+    private var onStartCallback: (() -> Unit)? = null
+    private var onSuccessCallback: ((coil.request.SuccessResult) -> Unit)? = null
+    private var onErrorCallback: ((coil.request.ErrorResult) -> Unit)? = null
+
+    /** 设置占位图资源 ID */
+    fun placeholder(res: Int) {
+        if (res != 0) builder.placeholder(res)
+    }
+
+    /** 设置占位图 Drawable */
+    fun placeholder(drawable: Drawable?) {
+        if (drawable != null) builder.placeholder(drawable)
+    }
+
+    /** 设置错误图资源 ID */
+    fun error(res: Int) {
+        if (res != 0) builder.error(res)
+    }
+
+    /** 设置错误图 Drawable */
+    fun error(drawable: Drawable?) {
+        if (drawable != null) builder.error(drawable)
+    }
+
+    /** 设置兜底图资源 ID（data 为 null 时显示） */
+    fun fallback(res: Int) {
+        fallbackResId = res
+        if (res != 0) builder.fallback(res)
+    }
+
+    /** 设置兜底图 Drawable（data 为 null 时显示） */
+    fun fallback(drawable: Drawable?) {
+        fallbackDrawable = drawable
+        if (drawable != null) builder.fallback(drawable)
+    }
+
+    /** 设置图片缩放方式 */
+    fun scale(scale: Scale) {
+        builder.scale(scale)
+    }
+
+    /** 启用圆形裁切（与 [roundedCorners] 互斥，优先级更高） */
+    fun circle() {
+        circleEnabled = true
+    }
+
+    /** 设置统一圆角半径（px） */
+    fun roundedCorners(radius: Float) {
+        roundedRadius = floatArrayOf(radius)
+    }
+
+    /** 分别设置四角圆角半径（px） */
+    fun roundedCorners(topLeft: Float, topRight: Float, bottomRight: Float, bottomLeft: Float) {
+        roundedRadius = floatArrayOf(topLeft, topRight, bottomRight, bottomLeft)
+    }
+
+    /** 指定加载尺寸（px） */
+    fun override(width: Int, height: Int) {
+        if (width > 0 && height > 0) builder.size(width, height)
+    }
+
+    /** 禁用内存和磁盘缓存 */
+    fun noCache() {
+        cacheDisabled = true
+        builder.memoryCachePolicy(CachePolicy.DISABLED)
+        builder.diskCachePolicy(CachePolicy.DISABLED)
+    }
+
+    /** 设置离线时是否仅使用缓存（默认 true） */
+    fun cacheOnlyOnOffline(enabled: Boolean) {
+        cacheOnlyOnOffline = enabled
+    }
+
+    /**
+     * 添加自定义 [Transformation]（累积模式，多次调用不会覆盖）。
+     *
+     * ```kotlin
+     * transform(GrayscaleTransformation(), BlurTransformation())
+     * ```
+     */
+    fun transform(vararg transformations: Transformation) {
+        transforms.addAll(transformations)
+    }
+
+    /** 设置是否启用渐入动画 */
+    fun crossfade(enabled: Boolean = true) {
+        crossfadeExplicitlySet = true
+        if (enabled) builder.crossfade(true)
+    }
+
+    /** 设置渐入动画时长（ms），>0 时自动启用渐入动画 */
+    fun crossfade(durationMs: Int) {
+        crossfadeExplicitlySet = true
+        if (durationMs > 0) builder.crossfade(durationMs)
+    }
+
+    /** 设置加载开始回调 */
+    fun onStart(action: () -> Unit) {
+        onStartCallback = action
+    }
+
+    /** 设置加载成功回调 */
+    fun onSuccess(action: (coil.request.SuccessResult) -> Unit) {
+        onSuccessCallback = action
+    }
+
+    /** 设置加载失败回调 */
+    fun onError(action: (coil.request.ErrorResult) -> Unit) {
+        onErrorCallback = action
+    }
+
+    /**
+     * 设置加载状态监听器（累积模式，非 null 参数才会覆盖已设置的回调）。
+     *
+     * ```kotlin
+     * listener(
+     *     onStart = { showProgress() },
+     *     onSuccess = { result -> hideProgress() },
+     *     onError = { result -> showRetry() }
+     * )
+     * ```
+     */
+    fun listener(
+        onStart: (() -> Unit)? = null,
+        onSuccess: ((coil.request.SuccessResult) -> Unit)? = null,
+        onError: ((coil.request.ErrorResult) -> Unit)? = null
+    ) {
+        onStart?.let { onStartCallback = it }
+        onSuccess?.let { onSuccessCallback = it }
+        onError?.let { onErrorCallback = it }
+    }
+
+    internal fun applyTo(context: android.content.Context) {
+        if (circleEnabled) {
+            transforms.add(CircleCropTransformation())
+        } else {
+            roundedRadius?.let { r ->
+                if (r.size == 1) {
+                    transforms.add(RoundedCornersTransformation(r[0]))
+                } else {
+                    transforms.add(RoundedCornersTransformation(r[0], r[1], r[2], r[3]))
+                }
+            }
+        }
+        if (transforms.isNotEmpty()) builder.transformations(transforms)
+
+        if (!cacheDisabled && cacheOnlyOnOffline && !NetworkMonitor.isConnected(context)) {
+            AwLogger.d("loadImage: offline, using cache-only policy")
+            builder.networkCachePolicy(CachePolicy.DISABLED)
+        }
+
+        val hasStart = onStartCallback != null
+        val hasSuccess = onSuccessCallback != null
+        val hasError = onErrorCallback != null
+        if (hasStart || hasSuccess || hasError) {
+            builder.listener(
+                onStart = {
+                    AwLogger.d("loadImage: onStart")
+                    onStartCallback?.invoke()
+                },
+                onSuccess = { _, result ->
+                    AwLogger.d("loadImage: onSuccess")
+                    onSuccessCallback?.invoke(result)
+                },
+                onError = { _, result ->
+                    AwLogger.e("loadImage: onError - ${result.throwable.message}")
+                    onErrorCallback?.invoke(result)
+                },
+            )
+        }
+    }
+
+    internal val isCrossfadeExplicitlySet: Boolean get() = crossfadeExplicitlySet
+}
+
+/**
  * 加载图片到 [ImageView]。
  *
  * 支持 URL / File / @DrawableRes / Uri 等数据源。
@@ -31,98 +242,70 @@ private val EMPTY_DISPOSABLE = object : Disposable {
  * // 带配置
  * imageView.loadImage(url) {
  *     placeholder(R.drawable.loading)
- *     error(R.drawable.error)
+ *     error(R.drawable.fail)
  *     circle()
  *     crossfade(300)
  * }
  * ```
  *
  * @param data   图片数据源，为 null 时显示 fallback 或全局错误图
- * @param config 可选的 DSL 配置块
+ * @param config 可选的 [AwImageScope] DSL 配置块
  * @return [Disposable]，始终非 null
  */
 fun ImageView.loadImage(
     data: Any?,
-    config: (ImageLoadConfig.() -> Unit)? = null
+    config: (AwImageScope.() -> Unit)? = null
 ): Disposable {
     if (data == null) {
         AwLogger.d("loadImage: data is null, showing fallback/error")
-        val fallback = if (config != null) {
-            val c = ImageLoadConfig().apply(config)
-            c.fallbackRes.takeIf { it != 0 } ?: AwImage.globalError
+        if (config != null) {
+            val scope = AwImageScope(ImageRequest.Builder(context).data(0))
+            scope.config()
+            val fbDrawable = scope.fallbackDrawable
+            val fbRes = scope.fallbackResId
+            when {
+                fbDrawable != null -> setImageDrawable(fbDrawable)
+                fbRes != 0 -> setImageResource(fbRes)
+                AwImage.globalErrorDrawable != null -> setImageDrawable(AwImage.globalErrorDrawable)
+                AwImage.globalError != 0 -> setImageResource(AwImage.globalError)
+                else -> setImageResource(0)
+            }
         } else {
-            AwImage.globalError
+            when {
+                AwImage.globalErrorDrawable != null -> setImageDrawable(AwImage.globalErrorDrawable)
+                AwImage.globalError != 0 -> setImageResource(AwImage.globalError)
+                else -> setImageResource(0)
+            }
         }
-        setImageResource(fallback)
         return EMPTY_DISPOSABLE
     }
-    val loadConfig = ImageLoadConfig().apply { config?.invoke(this) }
 
-    AwLogger.d("loadImage: data=$data, circle=${loadConfig.isCircle}, " +
-            "roundedCorners=${loadConfig.hasRoundedCorners}, cache=${loadConfig.cacheEnabled}")
+    AwLogger.d("loadImage: data=$data")
 
     return load(data) {
-        val ph = loadConfig.placeholderRes.takeIf { it != 0 } ?: AwImage.globalPlaceholder
-        if (ph != 0) placeholder(ph)
-
-        val err = loadConfig.errorRes.takeIf { it != 0 } ?: AwImage.globalError
-        if (err != 0) error(err)
-
-        if (loadConfig.fallbackRes != 0) fallback(loadConfig.fallbackRes)
-
-        scale(loadConfig.scale)
-
-        if (loadConfig.overrideWidth > 0 && loadConfig.overrideHeight > 0) {
-            size(loadConfig.overrideWidth, loadConfig.overrideHeight)
-        }
-
-        val transforms = mutableListOf<Transformation>()
-        if (loadConfig.isCircle) {
-            transforms.add(CircleCropTransformation())
-        } else if (loadConfig.hasRoundedCorners) {
-            transforms.add(
-                RoundedCornersTransformation(
-                    loadConfig.cornerTopLeft.takeIf { it >= 0f } ?: loadConfig.cornerRadius,
-                    loadConfig.cornerTopRight.takeIf { it >= 0f } ?: loadConfig.cornerRadius,
-                    loadConfig.cornerBottomRight.takeIf { it >= 0f } ?: loadConfig.cornerRadius,
-                    loadConfig.cornerBottomLeft.takeIf { it >= 0f } ?: loadConfig.cornerRadius,
-                )
-            )
-        }
-        loadConfig.customTransformations?.let { transforms.addAll(it) }
-        if (transforms.isNotEmpty()) transformations(transforms)
-
-        if (!loadConfig.cacheEnabled) {
-            memoryCachePolicy(CachePolicy.DISABLED)
-            diskCachePolicy(CachePolicy.DISABLED)
-        } else if (loadConfig.cacheOnlyOnOffline && !NetworkMonitor.isConnected(context)) {
-            AwLogger.d("loadImage: offline, using cache-only policy")
-            networkCachePolicy(CachePolicy.DISABLED)
-        }
-
+        val phDrawable = AwImage.globalPlaceholderDrawable
+        val phRes = AwImage.globalPlaceholder
         when {
-            loadConfig.crossfadeDuration > 0 -> crossfade(loadConfig.crossfadeDuration)
-            loadConfig.crossfadeEnabled -> crossfade(true)
+            phDrawable != null -> placeholder(phDrawable)
+            phRes != 0 -> placeholder(phRes)
         }
 
-        val hasStart = loadConfig.onStart != null
-        val hasSuccess = loadConfig.onSuccess != null
-        val hasError = loadConfig.onError != null
-        if (hasStart || hasSuccess || hasError) {
-            listener(
-                onStart = {
-                    AwLogger.d("loadImage: onStart")
-                    if (hasStart) loadConfig.onStart!!.invoke()
-                },
-                onSuccess = { _, result ->
-                    AwLogger.d("loadImage: onSuccess")
-                    if (hasSuccess) loadConfig.onSuccess!!.invoke(result)
-                },
-                onError = { _, result ->
-                    AwLogger.e("loadImage: onError - ${result.throwable.message}")
-                    if (hasError) loadConfig.onError!!.invoke(result)
-                },
-            )
+        val errDrawable = AwImage.globalErrorDrawable
+        val errRes = AwImage.globalError
+        when {
+            errDrawable != null -> error(errDrawable)
+            errRes != 0 -> error(errRes)
+        }
+
+        if (config != null) {
+            val scope = AwImageScope(this)
+            scope.config()
+            if (!scope.isCrossfadeExplicitlySet) {
+                crossfade(true)
+            }
+            scope.applyTo(context)
+        } else {
+            crossfade(true)
         }
     }
 }
@@ -166,162 +349,4 @@ fun ImageView.loadRounded(data: Any?, radiusPx: Float): Disposable {
  */
 fun ImageView.loadBlur(data: Any?, radius: Int = 15, sampling: Int = 4): Disposable {
     return loadImage(data) { transform(BlurTransformation(radius, sampling)) }
-}
-
-/**
- * [loadImage] 的 DSL 配置类。
- *
- * 通过链式调用配置占位图、缩放、圆角、缓存等属性。
- * 所有属性通过 setter 方法设置，外部不可直接赋值。
- *
- * ```kotlin
- * imageView.loadImage(url) {
- *     placeholder(R.drawable.loading)
- *     error(R.drawable.error)
- *     fallback(R.drawable.fallback)
- *     circle()
- *     crossfade(300)
- *     noCache()
- *     transform(GrayscaleTransformation())
- *     listener(
- *         onStart = { showProgress() },
- *         onSuccess = { result -> hideProgress() },
- *         onError = { result -> showRetry() }
- *     )
- * }
- * ```
- */
-class ImageLoadConfig {
-    /** 占位图资源 ID */
-    var placeholderRes: Int = 0
-        private set
-    /** 错误图资源 ID */
-    var errorRes: Int = 0
-        private set
-    /** 兜底图资源 ID（data 为 null 时显示） */
-    var fallbackRes: Int = 0
-        private set
-    /** 图片缩放方式 */
-    var scale: Scale = Scale.FIT
-        private set
-    /** 目标宽度（px），0 表示不限制 */
-    var overrideWidth: Int = 0
-        private set
-    /** 目标高度（px），0 表示不限制 */
-    var overrideHeight: Int = 0
-        private set
-    /** 是否启用圆形裁切（与 [hasRoundedCorners] 互斥，优先级更高） */
-    var isCircle: Boolean = false
-        private set
-    /** 统一圆角半径（px） */
-    var cornerRadius: Float = 0f
-        private set
-    /** 是否设置了圆角 */
-    var hasRoundedCorners: Boolean = false
-        private set
-    /** 左上角圆角半径（px），-1 表示使用 [cornerRadius] */
-    var cornerTopLeft: Float = -1f
-        private set
-    /** 右上角圆角半径（px），-1 表示使用 [cornerRadius] */
-    var cornerTopRight: Float = -1f
-        private set
-    /** 右下角圆角半径（px），-1 表示使用 [cornerRadius] */
-    var cornerBottomRight: Float = -1f
-        private set
-    /** 左下角圆角半径（px），-1 表示使用 [cornerRadius] */
-    var cornerBottomLeft: Float = -1f
-        private set
-    /** 自定义变换列表（累积模式） */
-    var customTransformations: List<Transformation>? = null
-        private set
-    /** 是否启用内存和磁盘缓存 */
-    var cacheEnabled: Boolean = true
-        private set
-    /** 离线时是否仅使用缓存（不发起网络请求） */
-    var cacheOnlyOnOffline: Boolean = true
-        private set
-    /** 是否启用渐入动画 */
-    var crossfadeEnabled: Boolean = true
-        private set
-    /** 渐入动画时长（ms），0 表示使用默认 */
-    var crossfadeDuration: Int = 0
-        private set
-
-    @Suppress("ktlint")
-    internal var onStart: (() -> Unit)? = null
-    @Suppress("ktlint")
-    internal var onSuccess: ((coil.request.SuccessResult) -> Unit)? = null
-    @Suppress("ktlint")
-    internal var onError: ((coil.request.ErrorResult) -> Unit)? = null
-
-    /** 设置占位图资源 */
-    fun placeholder(res: Int) { placeholderRes = res }
-    /** 设置错误图资源 */
-    fun error(res: Int) { errorRes = res }
-    /** 设置兜底图资源（data 为 null 时显示） */
-    fun fallback(res: Int) { fallbackRes = res }
-    /** 设置图片缩放方式 */
-    fun scale(scale: Scale) { this.scale = scale }
-    /** 启用圆形裁切（与 [roundedCorners] 互斥，优先级更高） */
-    fun circle() { isCircle = true }
-    /** 设置统一圆角半径（px） */
-    fun roundedCorners(radius: Float) {
-        cornerRadius = radius
-        hasRoundedCorners = true
-    }
-    /** 分别设置四角圆角半径（px） */
-    fun roundedCorners(topLeft: Float, topRight: Float, bottomRight: Float, bottomLeft: Float) {
-        cornerTopLeft = topLeft; cornerTopRight = topRight
-        cornerBottomRight = bottomRight; cornerBottomLeft = bottomLeft
-        hasRoundedCorners = true
-    }
-    /** 指定加载尺寸（px） */
-    fun override(width: Int, height: Int) { overrideWidth = width; overrideHeight = height }
-    /** 禁用内存和磁盘缓存 */
-    fun noCache() { cacheEnabled = false }
-    /** 设置离线时是否仅使用缓存（默认 true） */
-    fun cacheOnlyOnOffline(enabled: Boolean) { cacheOnlyOnOffline = enabled }
-    /**
-     * 添加自定义 [Transformation]（累积模式，多次调用不会覆盖）。
-     *
-     * ```kotlin
-     * transform(GrayscaleTransformation(), BlurTransformation())
-     * ```
-     */
-    fun transform(vararg transformations: Transformation) {
-        val existing = customTransformations ?: emptyList()
-        customTransformations = existing + transformations.toList()
-    }
-    /** 设置是否启用渐入动画 */
-    fun crossfade(enabled: Boolean = true) { crossfadeEnabled = enabled }
-    /** 设置渐入动画时长（ms），>0 时自动启用渐入动画 */
-    fun crossfade(durationMs: Int) {
-        crossfadeDuration = durationMs
-        if (durationMs > 0) crossfadeEnabled = true
-    }
-
-    /**
-     * 设置加载状态监听器。
-     *
-     * ```kotlin
-     * listener(
-     *     onStart = { showProgress() },
-     *     onSuccess = { result -> hideProgress() },
-     *     onError = { result -> showRetry() }
-     * )
-     * ```
-     *
-     * @param onStart   加载开始回调
-     * @param onSuccess 加载成功回调
-     * @param onError   加载失败回调
-     */
-    fun listener(
-        onStart: (() -> Unit)? = null,
-        onSuccess: ((coil.request.SuccessResult) -> Unit)? = null,
-        onError: ((coil.request.ErrorResult) -> Unit)? = null
-    ) {
-        this.onStart = onStart
-        this.onSuccess = onSuccess
-        this.onError = onError
-    }
 }

@@ -1,6 +1,5 @@
 package com.answufeng.image
 
-import android.content.Context
 import android.graphics.drawable.Drawable
 import coil.Coil
 import coil.request.ImageRequest
@@ -13,31 +12,34 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 
 /**
- * 图片预加载器——在后台提前加载图片到缓存，后续显示时直接读取。
+ * 图片预加载器。
+ *
+ * 支持单张/批量预加载和获取已缓存的 [Drawable]。
+ * 批量预加载通过 [Semaphore] 控制并发数，避免瞬间发起大量请求。
  *
  * ```kotlin
- * // 预加载单张
- * val success = ImagePreloader.preload(context, url)
+ * lifecycleScope.launch {
+ *     // 单张预加载
+ *     val success: Boolean = ImagePreloader.preload(context, url)
  *
- * // 批量预加载（并发可控）
- * ImagePreloader.preloadAll(context, urls, concurrency = 8)
+ *     // 批量预加载（返回每个 URL 的加载结果）
+ *     val results: List<Boolean> = ImagePreloader.preloadAll(context, urls, concurrency = 8)
  *
- * // 获取已缓存的 Drawable
- * val drawable = ImagePreloader.get(context, url)
+ *     // 获取已缓存的 Drawable
+ *     val drawable: Drawable? = ImagePreloader.get(context, url)
+ * }
  * ```
  */
 object ImagePreloader {
 
     /**
-     * 预加载单张图片到磁盘/内存缓存。
-     *
-     * 在 IO 线程执行，内置异常保护。
+     * 预加载单张图片到缓存。
      *
      * @param context Context
      * @param data    图片数据源（URL / File / @DrawableRes 等）
-     * @return `true` 加载成功，`false` 加载失败或异常
+     * @return `true` 表示加载成功并已缓存，`false` 表示失败
      */
-    suspend fun preload(context: Context, data: Any): Boolean {
+    suspend fun preload(context: android.content.Context, data: Any): Boolean {
         return withContext(Dispatchers.IO) {
             runCatching {
                 val request = ImageRequest.Builder(context)
@@ -56,13 +58,13 @@ object ImagePreloader {
     /**
      * 获取已缓存的图片 [Drawable]。
      *
-     * 如果图片未缓存，会同步加载。在 IO 线程执行。
+     * 内部禁用硬件 Bitmap（`allowHardware(false)`），确保返回的 Drawable 可直接使用。
      *
      * @param context Context
      * @param data    图片数据源
-     * @return [Drawable]，加载失败返回 null
+     * @return 已缓存的 [Drawable]，未命中缓存或加载失败时返回 null
      */
-    suspend fun get(context: Context, data: Any): Drawable? {
+    suspend fun get(context: android.content.Context, data: Any): Drawable? {
         return withContext(Dispatchers.IO) {
             runCatching {
                 val request = ImageRequest.Builder(context)
@@ -78,35 +80,36 @@ object ImagePreloader {
     }
 
     /**
-     * 批量预加载图片，使用 [Semaphore] 控制并发数。
+     * 批量预加载图片。
      *
-     * ```kotlin
-     * lifecycleScope.launch {
-     *     ImagePreloader.preloadAll(context, urls, concurrency = 8)
-     * }
-     * ```
+     * 使用 [Semaphore] 控制并发数，避免瞬间发起大量网络请求。
+     * 返回 `List<Boolean>` 表示每个 URL 的加载结果。
      *
      * @param context     Context
      * @param urls        图片数据源列表
-     * @param concurrency 最大并发数（默认 8，必须 >= 1）
+     * @param concurrency 最大并发数，默认 8
+     * @return 每个数据源的加载结果列表（`true` = 成功）
      * @throws IllegalArgumentException 如果 [concurrency] < 1
      */
-    suspend fun preloadAll(context: Context, urls: List<Any>, concurrency: Int = 8) {
+    suspend fun preloadAll(
+        context: android.content.Context,
+        urls: List<Any>,
+        concurrency: Int = 8
+    ): List<Boolean> {
         require(concurrency >= 1) { "concurrency must be >= 1, got $concurrency" }
         AwLogger.d("preloadAll: ${urls.size} URLs, concurrency=$concurrency")
         val semaphore = Semaphore(concurrency)
-        coroutineScope {
+        return coroutineScope {
             urls.map { url ->
                 async {
                     semaphore.acquire()
                     try {
-                        runCatching { preload(context, url) }
+                        preload(context, url)
                     } finally {
                         semaphore.release()
                     }
                 }
             }.awaitAll()
         }
-        AwLogger.d("preloadAll: complete")
     }
 }

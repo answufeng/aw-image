@@ -1,6 +1,7 @@
 package com.answufeng.image
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.os.Build
 import coil.Coil
 import coil.ImageLoader
@@ -8,6 +9,7 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import okhttp3.OkHttpClient
 import java.io.File
 
 /**
@@ -25,7 +27,9 @@ import java.io.File
  *             diskCacheSize(256L * 1024 * 1024)
  *             enableGif(true)
  *             placeholder(R.drawable.placeholder)
+ *             placeholder(ColorDrawable(Color.GRAY))
  *             error(R.drawable.error)
+ *             okHttpClient(myCustomClient)
  *             enableLogging(BuildConfig.DEBUG)
  *         }
  *     }
@@ -38,8 +42,16 @@ object AwImage {
     internal var globalPlaceholder: Int = 0
         private set
 
+    /** 全局占位图 Drawable，优先级高于 [globalPlaceholder] */
+    internal var globalPlaceholderDrawable: Drawable? = null
+        private set
+
     /** 全局错误图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
     internal var globalError: Int = 0
+        private set
+
+    /** 全局错误图 Drawable，优先级高于 [globalError] */
+    internal var globalErrorDrawable: Drawable? = null
         private set
 
     private var initialized = false
@@ -96,8 +108,12 @@ object AwImage {
             }
         }
 
+        imageConfig.okHttpClient?.let { builder.okHttpClient(it) }
+
         globalPlaceholder = imageConfig.placeholderRes
+        globalPlaceholderDrawable = imageConfig.placeholderDrawable
         globalError = imageConfig.errorRes
+        globalErrorDrawable = imageConfig.errorDrawable
 
         Coil.setImageLoader(builder.build())
         initialized = true
@@ -178,8 +194,20 @@ object AwImage {
         var placeholderRes: Int = 0
             private set
 
+        @Suppress("ktlint")
+        internal var placeholderDrawable: Drawable? = null
+            private set
+
         /** 全局错误图资源 ID */
         var errorRes: Int = 0
+            private set
+
+        @Suppress("ktlint")
+        internal var errorDrawable: Drawable? = null
+            private set
+
+        @Suppress("ktlint")
+        internal var okHttpClient: OkHttpClient? = null
             private set
 
         /** 按比例设置内存缓存大小（0.05~0.5） */
@@ -208,11 +236,20 @@ object AwImage {
         /** 设置是否启用 GIF 解码 */
         fun enableGif(enabled: Boolean) { gifEnabled = enabled }
 
-        /** 设置全局占位图 */
+        /** 设置全局占位图资源 ID */
         fun placeholder(res: Int) { placeholderRes = res }
 
-        /** 设置全局错误图 */
+        /** 设置全局占位图 Drawable（优先级高于资源 ID） */
+        fun placeholder(drawable: Drawable) { placeholderDrawable = drawable }
+
+        /** 设置全局错误图资源 ID */
         fun error(res: Int) { errorRes = res }
+
+        /** 设置全局错误图 Drawable（优先级高于资源 ID） */
+        fun error(drawable: Drawable) { errorDrawable = drawable }
+
+        /** 设置自定义 OkHttpClient（用于自定义超时、拦截器等） */
+        fun okHttpClient(client: OkHttpClient) { okHttpClient = client }
 
         /** 设置是否启用调试日志（默认 false） */
         fun enableLogging(enabled: Boolean) { AwLogger.enabled = enabled }
