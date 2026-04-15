@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".DemoApp"
         android:allowBackup="false"
-        android:label="aw-image Demo"
-        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
-
+        android:label="🖼️ 图片库演示"
+        android:theme="@style/Theme.MaterialComponents.Light.DarkActionBar">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -17,15 +16,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity android:name=".BasicLoadActivity" />
-        <activity android:name=".TransformActivity" />
-        <activity android:name=".AdvancedConfigActivity" />
-        <activity android:name=".PreloadActivity" />
-        <activity android:name=".GifActivity" />
-        <activity android:name=".CacheActivity" />
-        <activity android:name=".RecyclerViewActivity" />
-        <activity android:name=".ErrorHandlingActivity" />
-
+        <activity
+            android:name=".BasicLoadActivity"
+            android:exported="false" />
+        <activity
+            android:name=".TransformActivity"
+            android:exported="false" />
+        <activity
+            android:name=".AdvancedConfigActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ErrorHandlingActivity"
+            android:exported="false" />
+        <activity
+            android:name=".CacheActivity"
+            android:exported="false" />
+        <activity
+            android:name=".GifActivity"
+            android:exported="false" />
+        <activity
+            android:name=".PreloadActivity"
+            android:exported="false" />
+        <activity
+            android:name=".RecyclerViewActivity"
+            android:exported="false" />
     </application>
 </manifest>

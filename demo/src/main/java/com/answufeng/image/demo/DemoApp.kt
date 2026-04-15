@@ -14,7 +14,7 @@ class DemoApp : Application() {
             enableGif(true)
             placeholder(ColorDrawable(Color.parseColor("#FFE0E0E0")))
             error(ColorDrawable(Color.parseColor("#FFFFCDD2")))
-            enableLogging(BuildConfig.DEBUG)
+            enableLogging(true)
         }
     }
 }
