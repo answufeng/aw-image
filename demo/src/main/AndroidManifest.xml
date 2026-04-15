@@ -6,8 +6,10 @@
     <application
         android:name=".DemoApp"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="🖼️ 图片库演示"
-        android:theme="@style/Theme.MaterialComponents.Light.DarkActionBar">
+        android:theme="@style/Theme.Material3.DayNight">
         <activity
             android:name=".MainActivity"
             android:exported="true">
