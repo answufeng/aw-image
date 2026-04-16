@@ -3,10 +3,8 @@ package com.answufeng.image.demo
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.card.MaterialCardView
+import com.google.android.material.button.MaterialButton
 
 /**
  * aw-image 库功能演示
@@ -18,60 +16,68 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 主布局
-        val mainLayout = findViewById<LinearLayout>(R.id.mainLayout)
+        // 图片加载
+        findViewById<MaterialButton>(R.id.btnLoadNetwork).setOnClickListener {
+            startActivity(Intent(this, BasicLoadActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnLoadLocal).setOnClickListener {
+            startActivity(Intent(this, BasicLoadActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnLoadResource).setOnClickListener {
+            startActivity(Intent(this, BasicLoadActivity::class.java))
+        }
 
-        // 标题
-        mainLayout.addView(TextView(this).apply {
-            text = "🖼️ aw-image 功能演示"
-            textSize = 20f
-            setPadding(0, 0, 0, 20)
-        })
+        // 图片处理
+        findViewById<MaterialButton>(R.id.btnRoundCorner).setOnClickListener {
+            startActivity(Intent(this, TransformActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnCropImage).setOnClickListener {
+            startActivity(Intent(this, TransformActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnCompress).setOnClickListener {
+            startActivity(Intent(this, TransformActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnAddFilter).setOnClickListener {
+            startActivity(Intent(this, FilterActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnBlurImage).setOnClickListener {
+            startActivity(Intent(this, TransformActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnGrayScale).setOnClickListener {
+            startActivity(Intent(this, TransformActivity::class.java))
+        }
 
-        // 功能卡片
-        val features = listOf(
-            "📱 基本加载" to BasicLoadActivity::class.java,
-            "🎨 图片变换" to TransformActivity::class.java,
-            "⚙️ 高级配置" to AdvancedConfigActivity::class.java,
-            "⚠️ 错误处理" to ErrorHandlingActivity::class.java,
-            "⏳ 预加载" to PreloadActivity::class.java,
-            "🎯 GIF 支持" to GifActivity::class.java,
-            "💾 缓存管理" to CacheActivity::class.java,
-            "📋 RecyclerView" to RecyclerViewActivity::class.java,
-            "🔄 网络变换" to NetworkTransformActivity::class.java,
-            "🌈 滤镜效果" to FilterActivity::class.java
-        )
+        // 图片显示
+        findViewById<MaterialButton>(R.id.btnShowCircle).setOnClickListener {
+            startActivity(Intent(this, AdvancedConfigActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnShowRounded).setOnClickListener {
+            startActivity(Intent(this, AdvancedConfigActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnShowPlaceholder).setOnClickListener {
+            startActivity(Intent(this, ErrorHandlingActivity::class.java))
+        }
 
-        features.forEach { (title, clazz) ->
-            val card = MaterialCardView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 0, 0, 16)
-                }
-                setPadding(20, 20, 20, 20)
-            }
+        // 图片预览
+        findViewById<MaterialButton>(R.id.btnPreviewZoom).setOnClickListener {
+            startActivity(Intent(this, PreloadActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnPreviewRotate).setOnClickListener {
+            startActivity(Intent(this, PreloadActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnPreviewGesture).setOnClickListener {
+            startActivity(Intent(this, PreloadActivity::class.java))
+        }
 
-            val cardContent = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-            }
-
-            cardContent.addView(TextView(this).apply {
-                text = title
-                textSize = 16f
-                setPadding(0, 0, 0, 8)
-            })
-
-            cardContent.addView(Button(this).apply {
-                text = "进入演示"
-                setOnClickListener {
-                    startActivity(Intent(this@MainActivity, clazz))
-                }
-            })
-
-            card.addView(cardContent)
-            mainLayout.addView(card)
+        // 图片缓存
+        findViewById<MaterialButton>(R.id.btnMemoryCache).setOnClickListener {
+            startActivity(Intent(this, CacheActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnDiskCache).setOnClickListener {
+            startActivity(Intent(this, CacheActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.btnClearCache).setOnClickListener {
+            startActivity(Intent(this, CacheActivity::class.java))
         }
     }
 }

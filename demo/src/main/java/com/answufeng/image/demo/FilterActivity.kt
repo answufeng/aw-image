@@ -1,111 +1,92 @@
 package com.answufeng.image.demo
 
+import android.graphics.Color
 import android.os.Bundle
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
-import com.answufeng.image.AwImage
-import com.answufeng.image.transform.GrayscaleTransformation
-import com.answufeng.image.transform.ColorFilterTransformation
+import androidx.appcompat.app.AppCompatActivity
+import com.answufeng.image.BlurTransformation
+import com.answufeng.image.ColorFilterTransformation
+import com.answufeng.image.GrayscaleTransformation
+import com.answufeng.image.loadImage
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
-import com.google.android.material.imageview.ShapeableImageView
 
-class FilterActivity : BaseImageActivity() {
+class FilterActivity : AppCompatActivity() {
 
-    override fun getTitleText() = "🌈 滤镜效果"
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        title = "滤镜效果"
 
-    override fun setupContent(layout: LinearLayout) {
-        addSectionTitle("滤镜效果演示")
-
-        val imageCard = MaterialCardView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                300
-            )
-            setPadding(16, 16, 16, 16)
-            layout.addView(this)
+        val scrollView = ScrollView(this)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 24, 32, 24)
         }
 
-        val imageView = ShapeableImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.MATCH_PARENT
-            )
-            setPadding(16, 16, 16, 16)
-            imageCard.addView(this)
-        }
+        val sampleUrl = "https://picsum.photos/800/600"
 
-        val btnRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            setPadding(0, 16, 0, 16)
-            layout.addView(this)
-        }
-
-        MaterialButton(this).apply {
-            text = "原图"
-            setOnClickListener {
-                loadOriginalImage(imageView)
+        // 原图
+        layout.addView(createSectionLabel("原图"))
+        val originalIv = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400).apply {
+                topMargin = 12
             }
-            btnRow.addView(this, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            loadImage(sampleUrl)
         }
+        layout.addView(originalIv)
 
-        MaterialButton(this).apply {
-            text = "灰度"
-            setOnClickListener {
-                loadGrayscaleImage(imageView)
+        // 灰度滤镜
+        layout.addView(createSectionLabel("灰度滤镜"))
+        val grayscaleIv = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400).apply {
+                topMargin = 12
             }
-            btnRow.addView(this, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        }
-
-        MaterialButton(this).apply {
-            text = "怀旧"
-            setOnClickListener {
-                loadSepiaImage(imageView)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            loadImage(sampleUrl) {
+                transform(GrayscaleTransformation())
             }
-            btnRow.addView(this, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
+        layout.addView(grayscaleIv)
 
-        addDivider()
-
-        addSectionTitle("滤镜信息")
-
-        val infoCard = MaterialCardView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                200
-            )
-            layout.addView(this)
+        // 怀旧滤镜
+        layout.addView(createSectionLabel("怀旧滤镜"))
+        val sepiaIv = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400).apply {
+                topMargin = 12
+            }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            loadImage(sampleUrl) {
+                transform(ColorFilterTransformation(0x779E775C))
+            }
         }
+        layout.addView(sepiaIv)
 
-        val infoText = TextView(this).apply {
-            text = "点击按钮查看不同滤镜效果"
-            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
-            setTextColor(getColor(R.color.log_text))
-            typeface = android.graphics.Typeface.MONOSPACE
-            setPadding(16, 16, 16, 16)
-            background = getDrawable(R.drawable.bg_log)
-            infoCard.addView(this)
+        // 模糊滤镜
+        layout.addView(createSectionLabel("模糊滤镜"))
+        val blurIv = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400).apply {
+                topMargin = 12
+            }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            loadImage(sampleUrl) {
+                transform(BlurTransformation(15, 4))
+            }
         }
+        layout.addView(blurIv)
+
+        scrollView.addView(layout)
+        setContentView(scrollView)
     }
 
-    private fun loadOriginalImage(imageView: ShapeableImageView) {
-        AwImage.load("https://picsum.photos/800/600")
-            .into(imageView)
-    }
-
-    private fun loadGrayscaleImage(imageView: ShapeableImageView) {
-        AwImage.load("https://picsum.photos/800/600")
-            .transform(GrayscaleTransformation())
-            .into(imageView)
-    }
-
-    private fun loadSepiaImage(imageView: ShapeableImageView) {
-        AwImage.load("https://picsum.photos/800/600")
-            .transform(ColorFilterTransformation(0x779E775C))
-            .into(imageView)
+    private fun createSectionLabel(text: String): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 18f
+            setTextColor(Color.parseColor("#333333"))
+            setPadding(0, 28, 0, 4)
+        }
     }
 }
