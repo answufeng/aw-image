@@ -30,5 +30,7 @@
     public static ** loadImage(...);
     public static ** loadCircle(...);
     public static ** loadRounded(...);
+    public static ** loadRoundedDp(...);
+    public static ** loadCircleWithBorder(...);
     public static ** loadBlur(...);
 }

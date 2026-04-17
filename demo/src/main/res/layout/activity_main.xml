@@ -126,7 +126,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="圆角、裁剪、压缩、滤镜等图片处理功能"
+                            android:text="圆角、模糊、灰度、滤镜等图片处理功能"
                             style="@style/Text.AwImage.Body"
                             android:layout_marginBottom="12dp" />
 
@@ -142,41 +142,6 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="圆角处理"
-                                android:layout_marginEnd="4dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnCropImage"
-                                style="@style/MaterialButton.AwImage.Outlined"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="图片裁剪"
-                                android:layout_marginHorizontal="4dp" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnCompress"
-                                style="@style/MaterialButton.AwImage.Outlined"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="图片压缩"
-                                android:layout_marginStart="4dp" />
-
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_marginTop="8dp">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnAddFilter"
-                                style="@style/MaterialButton.AwImage.Outlined"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="添加滤镜"
                                 android:layout_marginEnd="4dp" />
 
                             <com.google.android.material.button.MaterialButton
@@ -196,6 +161,22 @@
                                 android:layout_weight="1"
                                 android:text="灰度处理"
                                 android:layout_marginStart="4dp" />
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnAddFilter"
+                                style="@style/MaterialButton.AwImage.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="添加滤镜" />
 
                         </LinearLayout>
 
@@ -266,7 +247,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- 图片预览卡片 -->
+                <!-- 列表与预加载卡片 -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -282,14 +263,14 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="图片预览"
+                            android:text="列表与预加载"
                             style="@style/Text.AwImage.Subtitle"
                             android:layout_marginBottom="12dp" />
 
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="缩放、旋转、手势操作等预览功能"
+                            android:text="RecyclerView 列表加载、预加载、GIF 支持"
                             style="@style/Text.AwImage.Body"
                             android:layout_marginBottom="12dp" />
 
@@ -299,30 +280,30 @@
                             android:orientation="horizontal">
 
                             <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPreviewZoom"
+                                android:id="@+id/btnRecyclerView"
                                 style="@style/MaterialButton.AwImage.Outlined"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="缩放预览"
+                                android:text="列表加载"
                                 android:layout_marginEnd="4dp" />
 
                             <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPreviewRotate"
+                                android:id="@+id/btnPreload"
                                 style="@style/MaterialButton.AwImage.Outlined"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="旋转预览"
+                                android:text="预加载"
                                 android:layout_marginHorizontal="4dp" />
 
                             <com.google.android.material.button.MaterialButton
-                                android:id="@+id/btnPreviewGesture"
+                                android:id="@+id/btnGif"
                                 style="@style/MaterialButton.AwImage.Outlined"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="手势操作"
+                                android:text="GIF"
                                 android:layout_marginStart="4dp" />
 
                         </LinearLayout>

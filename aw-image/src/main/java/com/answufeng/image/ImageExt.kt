@@ -1,6 +1,7 @@
 package com.answufeng.image
 
 import android.graphics.drawable.Drawable
+import android.util.TypedValue
 import android.widget.ImageView
 import coil.load
 import coil.request.CachePolicy
@@ -34,9 +35,11 @@ private val EMPTY_DISPOSABLE = object : Disposable {
  *     crossfade(300)
  *     noCache()
  *     transform(GrayscaleTransformation())
- *     onStart { showProgress() }
- *     onSuccess { result -> hideProgress() }
- *     onError { result -> showRetry() }
+ *     listener(
+ *         onStart = { showProgress() },
+ *         onSuccess = { result -> hideProgress() },
+ *         onError = { result -> showRetry() }
+ *     )
  * }
  * ```
  */
@@ -45,9 +48,12 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     private val transforms = mutableListOf<Transformation>()
     private var circleEnabled = false
     private var roundedRadius: FloatArray? = null
-    private var cacheOnlyOnOffline = true
+    private var offlineCacheEnabled = true
     private var cacheDisabled = false
+    private var memoryCacheOnlyEnabled = false
     private var crossfadeExplicitlySet = false
+    internal var tagValue: Any? = null
+        private set
 
     internal var fallbackResId: Int = 0
         private set
@@ -122,9 +128,30 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         builder.diskCachePolicy(CachePolicy.DISABLED)
     }
 
-    /** 设置离线时是否仅使用缓存（默认 true） */
+    /**
+     * 设置离线时是否仅使用缓存（默认 true）。
+     *
+     * 启用后，当设备无网络连接时，自动禁用网络请求，仅从内存/磁盘缓存读取图片。
+     */
+    fun offlineCacheEnabled(enabled: Boolean) {
+        offlineCacheEnabled = enabled
+    }
+
+    /** @suppress 使用 [offlineCacheEnabled] 替代 */
+    @Deprecated("Use offlineCacheEnabled instead", ReplaceWith("offlineCacheEnabled(enabled)"))
     fun cacheOnlyOnOffline(enabled: Boolean) {
-        cacheOnlyOnOffline = enabled
+        offlineCacheEnabled = enabled
+    }
+
+    /**
+     * 仅从内存缓存读取（跳过磁盘和网络）。
+     *
+     * 适用于极高频刷新场景，如 RecyclerView 快速滑动时避免磁盘 IO。
+     */
+    fun memoryCacheOnly() {
+        memoryCacheOnlyEnabled = true
+        builder.diskCachePolicy(CachePolicy.DISABLED)
+        builder.networkCachePolicy(CachePolicy.DISABLED)
     }
 
     /**
@@ -150,19 +177,18 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         if (durationMs > 0) builder.crossfade(durationMs)
     }
 
-    /** 设置加载开始回调 */
-    fun onStart(action: () -> Unit) {
-        onStartCallback = action
-    }
-
-    /** 设置加载成功回调 */
-    fun onSuccess(action: (coil.request.SuccessResult) -> Unit) {
-        onSuccessCallback = action
-    }
-
-    /** 设置加载失败回调 */
-    fun onError(action: (coil.request.ErrorResult) -> Unit) {
-        onErrorCallback = action
+    /**
+     * 设置请求标签，用于批量取消。
+     *
+     * ```kotlin
+     * imageView.loadImage(url) { tag("feed_list") }
+     * // 退出页面时批量取消
+     * AwImage.cancelByTag(context, "feed_list")
+     * ```
+     */
+    fun tag(key: Any) {
+        tagValue = key
+        builder.tag(key)
     }
 
     /**
@@ -200,7 +226,7 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         }
         if (transforms.isNotEmpty()) builder.transformations(transforms)
 
-        if (!cacheDisabled && cacheOnlyOnOffline && !NetworkMonitor.isConnected(context)) {
+        if (!cacheDisabled && !memoryCacheOnlyEnabled && offlineCacheEnabled && !NetworkMonitor.isConnected(context)) {
             AwLogger.d("loadImage: offline, using cache-only policy")
             builder.networkCachePolicy(CachePolicy.DISABLED)
         }
@@ -239,7 +265,10 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
  * // 最简用法
  * imageView.loadImage("https://example.com/photo.jpg")
  *
- * // 带配置
+ * // 带常用参数
+ * imageView.loadImage(url, placeholder = R.drawable.loading, errorRes = R.drawable.fail)
+ *
+ * // 带完整配置
  * imageView.loadImage(url) {
  *     placeholder(R.drawable.loading)
  *     error(R.drawable.fail)
@@ -248,30 +277,38 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
  * }
  * ```
  *
- * @param data   图片数据源，为 null 时显示 fallback 或全局错误图
- * @param config 可选的 [AwImageScope] DSL 配置块
+ * @param data        图片数据源，为 null 时显示 fallback 或全局错误图
+ * @param placeholder 占位图资源 ID（0 表示不设置，使用全局配置）
+ * @param errorRes    错误图资源 ID（0 表示不设置，使用全局配置）
+ * @param config      可选的 [AwImageScope] DSL 配置块
  * @return [Disposable]，始终非 null
  */
 fun ImageView.loadImage(
     data: Any?,
+    placeholder: Int = 0,
+    errorRes: Int = 0,
     config: (AwImageScope.() -> Unit)? = null
 ): Disposable {
     if (data == null) {
         AwLogger.d("loadImage: data is null, showing fallback/error")
         if (config != null) {
-            val scope = AwImageScope(ImageRequest.Builder(context).data(0))
+            val scope = AwImageScope(ImageRequest.Builder(context))
             scope.config()
             val fbDrawable = scope.fallbackDrawable
             val fbRes = scope.fallbackResId
             when {
                 fbDrawable != null -> setImageDrawable(fbDrawable)
                 fbRes != 0 -> setImageResource(fbRes)
+                AwImage.globalFallbackDrawable != null -> setImageDrawable(AwImage.globalFallbackDrawable)
+                AwImage.globalFallback != 0 -> setImageResource(AwImage.globalFallback)
                 AwImage.globalErrorDrawable != null -> setImageDrawable(AwImage.globalErrorDrawable)
                 AwImage.globalError != 0 -> setImageResource(AwImage.globalError)
                 else -> setImageResource(0)
             }
         } else {
             when {
+                AwImage.globalFallbackDrawable != null -> setImageDrawable(AwImage.globalFallbackDrawable)
+                AwImage.globalFallback != 0 -> setImageResource(AwImage.globalFallback)
                 AwImage.globalErrorDrawable != null -> setImageDrawable(AwImage.globalErrorDrawable)
                 AwImage.globalError != 0 -> setImageResource(AwImage.globalError)
                 else -> setImageResource(0)
@@ -282,10 +319,13 @@ fun ImageView.loadImage(
 
     AwLogger.d("loadImage: data=$data")
 
-    return load(data) {
+    var tagValue: Any? = null
+
+    val disposable = load(data) {
         val phDrawable = AwImage.globalPlaceholderDrawable
         val phRes = AwImage.globalPlaceholder
         when {
+            placeholder != 0 -> placeholder(placeholder)
             phDrawable != null -> placeholder(phDrawable)
             phRes != 0 -> placeholder(phRes)
         }
@@ -293,6 +333,7 @@ fun ImageView.loadImage(
         val errDrawable = AwImage.globalErrorDrawable
         val errRes = AwImage.globalError
         when {
+            errorRes != 0 -> error(errorRes)
             errDrawable != null -> error(errDrawable)
             errRes != 0 -> error(errRes)
         }
@@ -304,10 +345,17 @@ fun ImageView.loadImage(
                 crossfade(true)
             }
             scope.applyTo(context)
+            tagValue = scope.tagValue
         } else {
             crossfade(true)
         }
     }
+
+    if (tagValue != null) {
+        AwImage.registerTaggedDisposable(tagValue!!, disposable)
+    }
+
+    return disposable
 }
 
 /**
@@ -323,7 +371,7 @@ fun ImageView.loadCircle(data: Any?): Disposable {
 }
 
 /**
- * 以指定圆角加载图片。
+ * 以指定圆角加载图片（px 单位）。
  *
  * 等价于 `loadImage(data) { roundedCorners(radiusPx) }`。
  *
@@ -335,6 +383,46 @@ fun ImageView.loadCircle(data: Any?): Disposable {
 fun ImageView.loadRounded(data: Any?, radiusPx: Float): Disposable {
     require(radiusPx >= 0f) { "radiusPx must be >= 0, got $radiusPx" }
     return loadImage(data) { roundedCorners(radiusPx) }
+}
+
+/**
+ * 以指定圆角加载图片（dp 单位）。
+ *
+ * 自动将 dp 转换为 px。
+ *
+ * @param data   图片数据源
+ * @param radiusDp 圆角半径（dp），必须 >= 0
+ * @return [Disposable] 用于手动取消
+ * @throws IllegalArgumentException 如果 [radiusDp] < 0
+ */
+fun ImageView.loadRoundedDp(data: Any?, radiusDp: Float): Disposable {
+    require(radiusDp >= 0f) { "radiusDp must be >= 0, got $radiusDp" }
+    val px = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP, radiusDp, context.resources.displayMetrics
+    )
+    return loadImage(data) { roundedCorners(px) }
+}
+
+/**
+ * 以圆形裁切+边框方式加载图片。
+ *
+ * 适用于头像等圆形带边框场景。
+ *
+ * @param data         图片数据源
+ * @param borderWidth  边框宽度（px），必须 > 0
+ * @param borderColor  边框颜色
+ * @return [Disposable] 用于手动取消
+ * @throws IllegalArgumentException 如果 [borderWidth] <= 0
+ */
+fun ImageView.loadCircleWithBorder(
+    data: Any?,
+    borderWidth: Float = 4f,
+    borderColor: Int = android.graphics.Color.WHITE
+): Disposable {
+    return loadImage(data) {
+        circle()
+        transform(BorderTransformation(borderWidth, borderColor, circle = true))
+    }
 }
 
 /**

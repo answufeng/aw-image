@@ -9,8 +9,10 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import coil.request.Disposable
 import okhttp3.OkHttpClient
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * aw-image 图片加载库全局配置入口。
@@ -39,25 +41,42 @@ import java.io.File
 object AwImage {
 
     /** 全局占位图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
+    @Volatile
     internal var globalPlaceholder: Int = 0
         private set
 
     /** 全局占位图 Drawable，优先级高于 [globalPlaceholder] */
+    @Volatile
     internal var globalPlaceholderDrawable: Drawable? = null
         private set
 
     /** 全局错误图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
+    @Volatile
     internal var globalError: Int = 0
         private set
 
     /** 全局错误图 Drawable，优先级高于 [globalError] */
+    @Volatile
     internal var globalErrorDrawable: Drawable? = null
         private set
 
+    /** 全局兜底图资源 ID，data 为 null 时使用 */
+    @Volatile
+    internal var globalFallback: Int = 0
+        private set
+
+    /** 全局兜底图 Drawable，优先级高于 [globalFallback] */
+    @Volatile
+    internal var globalFallbackDrawable: Drawable? = null
+        private set
+
+    @Volatile
     private var initialized = false
 
     /** 是否已调用 [init] */
     val isInitialized: Boolean get() = initialized
+
+    private val taggedDisposables = ConcurrentHashMap<Any, MutableList<Disposable>>()
 
     /**
      * 初始化全局 ImageLoader。
@@ -66,8 +85,9 @@ object AwImage {
      *
      * @param context 任意 Context，内部会转为 ApplicationContext
      * @param config  可选的 DSL 配置块
+     * @return 创建的 [ImageLoader] 实例，方便高级用户进一步定制
      */
-    fun init(context: Context, config: (ImageConfig.() -> Unit)? = null) {
+    fun init(context: Context, config: (ImageConfig.() -> Unit)? = null): ImageLoader {
         val appContext = context.applicationContext
         val imageConfig = ImageConfig().apply { config?.invoke(this) }
 
@@ -84,7 +104,7 @@ object AwImage {
             val memBuilder = MemoryCache.Builder(appContext)
             val maxBytes = imageConfig.memoryCacheMaxBytes
             if (maxBytes != null) {
-                memBuilder.maxSizeBytes(maxBytes.toInt())
+                memBuilder.maxSizeBytes(maxBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
             } else {
                 memBuilder.maxSizePercent(imageConfig.memoryCachePercent)
             }
@@ -111,13 +131,17 @@ object AwImage {
         imageConfig.okHttpClient?.let { builder.okHttpClient(it) }
 
         globalPlaceholder = imageConfig.placeholderRes
-        globalPlaceholderDrawable = imageConfig.placeholderDrawable
+        globalPlaceholderDrawable = imageConfig.placeholderDrawable?.constantState?.newDrawable()?.mutate()
         globalError = imageConfig.errorRes
-        globalErrorDrawable = imageConfig.errorDrawable
+        globalErrorDrawable = imageConfig.errorDrawable?.constantState?.newDrawable()?.mutate()
+        globalFallback = imageConfig.fallbackRes
+        globalFallbackDrawable = imageConfig.fallbackDrawable?.constantState?.newDrawable()?.mutate()
 
-        Coil.setImageLoader(builder.build())
+        val imageLoader = builder.build()
+        Coil.setImageLoader(imageLoader)
         initialized = true
         AwLogger.d("AwImage.init: complete")
+        return imageLoader
     }
 
     /** 获取当前 ImageLoader 实例 */
@@ -154,6 +178,59 @@ object AwImage {
         }.onFailure {
             AwLogger.e("clearDiskCache: failed", it)
         }.isSuccess
+    }
+
+    /**
+     * 获取内存缓存当前占用字节数。
+     *
+     * @return 缓存字节数，未初始化或获取失败返回 0
+     */
+    fun getMemoryCacheSize(context: Context): Long {
+        return runCatching {
+            imageLoader(context).memoryCache?.size?.toLong() ?: 0L
+        }.onFailure {
+            AwLogger.e("getMemoryCacheSize: failed", it)
+        }.getOrDefault(0L)
+    }
+
+    /**
+     * 获取磁盘缓存当前占用字节数。
+     *
+     * @return 缓存字节数，未初始化或获取失败返回 0
+     */
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
+    fun getDiskCacheSize(context: Context): Long {
+        return runCatching {
+            imageLoader(context).diskCache?.size ?: 0L
+        }.onFailure {
+            AwLogger.e("getDiskCacheSize: failed", it)
+        }.getOrDefault(0L)
+    }
+
+    /**
+     * 取消指定标签的所有图片加载请求。
+     *
+     * ```kotlin
+     * // 加载时设置标签
+     * imageView.loadImage(url) { tag("feed_list") }
+     *
+     * // 退出页面时批量取消
+     * AwImage.cancelByTag(context, "feed_list")
+     * ```
+     *
+     * @param context Context
+     * @param tag     请求标签
+     */
+    fun cancelByTag(tag: Any) {
+        val disposables = taggedDisposables.remove(tag) ?: return
+        for (d in disposables) {
+            if (!d.isDisposed) d.dispose()
+        }
+        AwLogger.d("cancelByTag: cancelled ${disposables.size} requests for tag=$tag")
+    }
+
+    internal fun registerTaggedDisposable(tag: Any, disposable: Disposable) {
+        taggedDisposables.getOrPut(tag) { mutableListOf() }.add(disposable)
     }
 
     /**
@@ -206,6 +283,14 @@ object AwImage {
         internal var errorDrawable: Drawable? = null
             private set
 
+        /** 全局兜底图资源 ID */
+        var fallbackRes: Int = 0
+            private set
+
+        @Suppress("ktlint")
+        internal var fallbackDrawable: Drawable? = null
+            private set
+
         @Suppress("ktlint")
         internal var okHttpClient: OkHttpClient? = null
             private set
@@ -247,6 +332,12 @@ object AwImage {
 
         /** 设置全局错误图 Drawable（优先级高于资源 ID） */
         fun error(drawable: Drawable) { errorDrawable = drawable }
+
+        /** 设置全局兜底图资源 ID（data 为 null 时显示） */
+        fun fallback(res: Int) { fallbackRes = res }
+
+        /** 设置全局兜底图 Drawable（data 为 null 时显示，优先级高于资源 ID） */
+        fun fallback(drawable: Drawable) { fallbackDrawable = drawable }
 
         /** 设置自定义 OkHttpClient（用于自定义超时、拦截器等） */
         fun okHttpClient(client: OkHttpClient) { okHttpClient = client }

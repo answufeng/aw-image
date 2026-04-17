@@ -40,12 +40,13 @@ object ImagePreloader {
      * @return `true` 表示加载成功并已缓存，`false` 表示失败
      */
     suspend fun preload(context: android.content.Context, data: Any): Boolean {
+        val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
-                val request = ImageRequest.Builder(context)
+                val request = ImageRequest.Builder(appContext)
                     .data(data)
                     .build()
-                val result = Coil.imageLoader(context).execute(request)
+                val result = Coil.imageLoader(appContext).execute(request)
                 val success = result is SuccessResult
                 AwLogger.d("preload: data=$data, success=$success")
                 success
@@ -65,13 +66,14 @@ object ImagePreloader {
      * @return 已缓存的 [Drawable]，未命中缓存或加载失败时返回 null
      */
     suspend fun get(context: android.content.Context, data: Any): Drawable? {
+        val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
-                val request = ImageRequest.Builder(context)
+                val request = ImageRequest.Builder(appContext)
                     .data(data)
                     .allowHardware(false)
                     .build()
-                val result = Coil.imageLoader(context).execute(request)
+                val result = Coil.imageLoader(appContext).execute(request)
                 (result as? SuccessResult)?.drawable
             }.onFailure {
                 AwLogger.e("get: failed for data=$data", it)
@@ -97,6 +99,7 @@ object ImagePreloader {
         concurrency: Int = 8
     ): List<Boolean> {
         require(concurrency >= 1) { "concurrency must be >= 1, got $concurrency" }
+        val appContext = context.applicationContext
         AwLogger.d("preloadAll: ${urls.size} URLs, concurrency=$concurrency")
         val semaphore = Semaphore(concurrency)
         return coroutineScope {
@@ -104,7 +107,7 @@ object ImagePreloader {
                 async {
                     semaphore.acquire()
                     try {
-                        preload(context, url)
+                        preload(appContext, url)
                     } finally {
                         semaphore.release()
                     }

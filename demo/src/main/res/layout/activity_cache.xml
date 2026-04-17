@@ -9,24 +9,41 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <TextView
+            android:id="@+id/tvMemSize"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvDiskSize"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
         <Button
             android:id="@+id/btnClearMemory"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Clear Memory Cache" />
+            android:layout_marginTop="24dp"
+            android:text="清除内存缓存" />
 
         <Button
             android:id="@+id/btnClearDisk"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Clear Disk Cache" />
+            android:text="清除磁盘缓存" />
 
         <TextView
             android:id="@+id/tvResult"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingTop="16dp" />
+            android:paddingTop="16dp"
+            android:textSize="14sp" />
 
     </LinearLayout>
 

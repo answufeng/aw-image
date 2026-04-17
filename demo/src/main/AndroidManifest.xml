@@ -43,9 +43,6 @@
             android:name=".RecyclerViewActivity"
             android:exported="false" />
         <activity
-            android:name=".NetworkTransformActivity"
-            android:exported="false" />
-        <activity
             android:name=".FilterActivity"
             android:exported="false" />
     </application>

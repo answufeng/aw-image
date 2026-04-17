@@ -187,20 +187,11 @@ internal object StackBlur {
         val divSum = (div + 1) shr 1
         val divSumSq = divSum * divSum
 
-        val r = IntArray(size)
-        val g = IntArray(size)
-        val b = IntArray(size)
-        val a = IntArray(size)
-
         val vMin = getBuffer(maxOf(w, h))
 
-        for (y in 0 until h) {
-            horizontalPass(pixels, r, g, b, a, vMin, w, h, y, radius, div, divSumSq)
-        }
+        horizontalPass(pixels, vMin, w, h, radius, div, divSumSq)
 
-        for (x in 0 until w) {
-            verticalPass(pixels, r, g, b, a, vMin, w, h, x, radius, div, divSumSq)
-        }
+        verticalPass(pixels, vMin, w, h, radius, div, divSumSq)
 
         val config = bitmap.config ?: Bitmap.Config.ARGB_8888
         return Bitmap.createBitmap(w, h, config).also {
@@ -209,126 +200,132 @@ internal object StackBlur {
     }
 
     private fun horizontalPass(
-        pixels: IntArray, r: IntArray, g: IntArray, b: IntArray, a: IntArray,
-        vMin: IntArray, w: Int, h: Int, y: Int,
+        pixels: IntArray, vMin: IntArray, w: Int, h: Int,
         radius: Int, div: Int, divSumSq: Int,
     ) {
-        var sumR = 0; var sumG = 0; var sumB = 0; var sumA = 0
-        var inSumR = 0; var inSumG = 0; var inSumB = 0; var inSumA = 0
-        var outSumR = 0; var outSumG = 0; var outSumB = 0; var outSumA = 0
-
         val stack = Array(div) { IntArray(4) }
 
-        for (i in -radius..radius) {
-            val p = pixels[y * w + min(w - 1, maxOf(i, 0))]
-            val sir = stack[i + radius]
-            sir[0] = (p shr 16) and 0xff
-            sir[1] = (p shr 8) and 0xff
-            sir[2] = p and 0xff
-            sir[3] = (p ushr 24) and 0xff
-            val weight = radius + 1 - kotlin.math.abs(i)
-            sumR += sir[0] * weight; sumG += sir[1] * weight
-            sumB += sir[2] * weight; sumA += sir[3] * weight
-            if (i > 0) {
+        for (y in 0 until h) {
+            var sumR = 0; var sumG = 0; var sumB = 0; var sumA = 0
+            var inSumR = 0; var inSumG = 0; var inSumB = 0; var inSumA = 0
+            var outSumR = 0; var outSumG = 0; var outSumB = 0; var outSumA = 0
+
+            for (i in -radius..radius) {
+                val p = pixels[y * w + min(w - 1, maxOf(i, 0))]
+                val sir = stack[i + radius]
+                sir[0] = (p shr 16) and 0xff
+                sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff
+                sir[3] = (p ushr 24) and 0xff
+                val weight = radius + 1 - kotlin.math.abs(i)
+                sumR += sir[0] * weight; sumG += sir[1] * weight
+                sumB += sir[2] * weight; sumA += sir[3] * weight
+                if (i > 0) {
+                    inSumR += sir[0]; inSumG += sir[1]
+                    inSumB += sir[2]; inSumA += sir[3]
+                } else {
+                    outSumR += sir[0]; outSumG += sir[1]
+                    outSumB += sir[2]; outSumA += sir[3]
+                }
+            }
+
+            var sp = radius
+            for (x in 0 until w) {
+                val idx = y * w + x
+                pixels[idx] = ((sumA / divSumSq).coerceIn(0, 255) shl 24) or
+                        ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
+                        ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
+                        (sumB / divSumSq).coerceIn(0, 255)
+
+                sumR -= outSumR; sumG -= outSumG
+                sumB -= outSumB; sumA -= outSumA
+
+                val si = (sp - radius + div) % div
+                val sir = stack[si]
+                outSumR -= sir[0]; outSumG -= sir[1]
+                outSumB -= sir[2]; outSumA -= sir[3]
+
+                if (y == 0) vMin[x] = min(x + radius + 1, w - 1)
+                val p = pixels[y * w + vMin[x]]
+                sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
                 inSumR += sir[0]; inSumG += sir[1]
                 inSumB += sir[2]; inSumA += sir[3]
-            } else {
-                outSumR += sir[0]; outSumG += sir[1]
-                outSumB += sir[2]; outSumA += sir[3]
+                sumR += inSumR; sumG += inSumG
+                sumB += inSumB; sumA += inSumA
+
+                sp = (sp + 1) % div
+                val sir2 = stack[sp]
+                outSumR += sir2[0]; outSumG += sir2[1]
+                outSumB += sir2[2]; outSumA += sir2[3]
+                inSumR -= sir2[0]; inSumG -= sir2[1]
+                inSumB -= sir2[2]; inSumA -= sir2[3]
             }
-        }
-
-        var sp = radius
-        for (x in 0 until w) {
-            val idx = y * w + x
-            r[idx] = (sumR / divSumSq).coerceIn(0, 255)
-            g[idx] = (sumG / divSumSq).coerceIn(0, 255)
-            b[idx] = (sumB / divSumSq).coerceIn(0, 255)
-            a[idx] = (sumA / divSumSq).coerceIn(0, 255)
-
-            sumR -= outSumR; sumG -= outSumG
-            sumB -= outSumB; sumA -= outSumA
-
-            val si = (sp - radius + div) % div
-            val sir = stack[si]
-            outSumR -= sir[0]; outSumG -= sir[1]
-            outSumB -= sir[2]; outSumA -= sir[3]
-
-            if (y == 0) vMin[x] = min(x + radius + 1, w - 1)
-            val p = pixels[y * w + vMin[x]]
-            sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
-            sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
-            inSumR += sir[0]; inSumG += sir[1]
-            inSumB += sir[2]; inSumA += sir[3]
-            sumR += inSumR; sumG += inSumG
-            sumB += inSumB; sumA += inSumA
-
-            sp = (sp + 1) % div
-            val sir2 = stack[sp]
-            outSumR += sir2[0]; outSumG += sir2[1]
-            outSumB += sir2[2]; outSumA += sir2[3]
-            inSumR -= sir2[0]; inSumG -= sir2[1]
-            inSumB -= sir2[2]; inSumA -= sir2[3]
         }
     }
 
     private fun verticalPass(
-        pixels: IntArray, r: IntArray, g: IntArray, b: IntArray, a: IntArray,
-        vMin: IntArray, w: Int, h: Int, x: Int,
+        pixels: IntArray, vMin: IntArray, w: Int, h: Int,
         radius: Int, div: Int, divSumSq: Int,
     ) {
-        var sumR = 0; var sumG = 0; var sumB = 0; var sumA = 0
-        var inSumR = 0; var inSumG = 0; var inSumB = 0; var inSumA = 0
-        var outSumR = 0; var outSumG = 0; var outSumB = 0; var outSumA = 0
-
         val stack = Array(div) { IntArray(4) }
 
-        for (i in -radius..radius) {
-            val yp = min(h - 1, maxOf(i, 0))
-            val idx = yp * w + x
-            val sir = stack[i + radius]
-            sir[0] = r[idx]; sir[1] = g[idx]; sir[2] = b[idx]; sir[3] = a[idx]
-            val weight = radius + 1 - kotlin.math.abs(i)
-            sumR += sir[0] * weight; sumG += sir[1] * weight
-            sumB += sir[2] * weight; sumA += sir[3] * weight
-            if (i > 0) {
+        for (x in 0 until w) {
+            var sumR = 0; var sumG = 0; var sumB = 0; var sumA = 0
+            var inSumR = 0; var inSumG = 0; var inSumB = 0; var inSumA = 0
+            var outSumR = 0; var outSumG = 0; var outSumB = 0; var outSumA = 0
+
+            for (i in -radius..radius) {
+                val yp = min(h - 1, maxOf(i, 0))
+                val idx = yp * w + x
+                val p = pixels[idx]
+                val sir = stack[i + radius]
+                sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
+                val weight = radius + 1 - kotlin.math.abs(i)
+                sumR += sir[0] * weight; sumG += sir[1] * weight
+                sumB += sir[2] * weight; sumA += sir[3] * weight
+                if (i > 0) {
+                    inSumR += sir[0]; inSumG += sir[1]
+                    inSumB += sir[2]; inSumA += sir[3]
+                } else {
+                    outSumR += sir[0]; outSumG += sir[1]
+                    outSumB += sir[2]; outSumA += sir[3]
+                }
+            }
+
+            var sp = radius
+            for (y in 0 until h) {
+                val idx = y * w + x
+                pixels[idx] = ((sumA / divSumSq).coerceIn(0, 255) shl 24) or
+                        ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
+                        ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
+                        (sumB / divSumSq).coerceIn(0, 255)
+
+                sumR -= outSumR; sumG -= outSumG
+                sumB -= outSumB; sumA -= outSumA
+                val si = (sp - radius + div) % div
+                val sir = stack[si]
+                outSumR -= sir[0]; outSumG -= sir[1]
+                outSumB -= sir[2]; outSumA -= sir[3]
+
+                if (x == 0) vMin[y] = min(y + radius + 1, h - 1)
+                val idx2 = vMin[y] * w + x
+                val p = pixels[idx2]
+                sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
                 inSumR += sir[0]; inSumG += sir[1]
                 inSumB += sir[2]; inSumA += sir[3]
-            } else {
-                outSumR += sir[0]; outSumG += sir[1]
-                outSumB += sir[2]; outSumA += sir[3]
+                sumR += inSumR; sumG += inSumG
+                sumB += inSumB; sumA += inSumA
+
+                sp = (sp + 1) % div
+                val sir2 = stack[sp]
+                outSumR += sir2[0]; outSumG += sir2[1]
+                outSumB += sir2[2]; outSumA += sir2[3]
+                inSumR -= sir2[0]; inSumG -= sir2[1]
+                inSumB -= sir2[2]; inSumA -= sir2[3]
             }
-        }
-
-        var sp = radius
-        for (y in 0 until h) {
-            val idx = y * w + x
-            pixels[idx] = ((sumA / divSumSq).coerceIn(0, 255) shl 24) or
-                    ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
-                    ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
-                    (sumB / divSumSq).coerceIn(0, 255)
-
-            sumR -= outSumR; sumG -= outSumG
-            sumB -= outSumB; sumA -= outSumA
-            val si = (sp - radius + div) % div
-            val sir = stack[si]
-            outSumR -= sir[0]; outSumG -= sir[1]
-            outSumB -= sir[2]; outSumA -= sir[3]
-
-            if (x == 0) vMin[y] = min(y + radius + 1, h - 1)
-            val idx2 = vMin[y] * w + x
-            sir[0] = r[idx2]; sir[1] = g[idx2]; sir[2] = b[idx2]; sir[3] = a[idx2]
-            inSumR += sir[0]; inSumG += sir[1]
-            inSumB += sir[2]; inSumA += sir[3]
-            sumR += inSumR; sumG += inSumG
-            sumB += inSumB; sumA += inSumA
-
-            sp = (sp + 1) % div
-            val sir2 = stack[sp]
-            outSumR += sir2[0]; outSumG += sir2[1]
-            outSumB += sir2[2]; outSumA += sir2[3]
-            inSumR -= sir2[0]; inSumG -= sir2[1]
-            inSumB -= sir2[2]; inSumA -= sir2[3]
         }
     }
 }

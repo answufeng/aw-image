@@ -16,7 +16,7 @@ import android.net.NetworkCapabilities
 internal object NetworkMonitor {
 
     @Volatile
-    private var connected: Boolean = true
+    private var connected: Boolean = false
 
     @Volatile
     private var registered = false

@@ -17,6 +17,8 @@ class AwImageTest {
         assertNull(config.placeholderDrawable)
         assertEquals(0, config.errorRes)
         assertNull(config.errorDrawable)
+        assertEquals(0, config.fallbackRes)
+        assertNull(config.fallbackDrawable)
         assertNull(config.memoryCacheMaxBytes)
         assertNull(config.diskCacheDir)
         assertNull(config.okHttpClient)
@@ -70,6 +72,16 @@ class AwImageTest {
     }
 
     @Test
+    fun `ImageConfig fallback setters`() {
+        val config = AwImage.ImageConfig()
+        config.fallback(789)
+        assertEquals(789, config.fallbackRes)
+        val drawable = android.graphics.drawable.ColorDrawable(0xFF000000.toInt())
+        config.fallback(drawable)
+        assertEquals(drawable, config.fallbackDrawable)
+    }
+
+    @Test
     fun `ImageConfig crossfade setters`() {
         val config = AwImage.ImageConfig()
         config.crossfade(false)
@@ -113,5 +125,11 @@ class AwImageTest {
     fun `globalPlaceholderDrawable and globalErrorDrawable default to null`() {
         assertNull(AwImage.globalPlaceholderDrawable)
         assertNull(AwImage.globalErrorDrawable)
+    }
+
+    @Test
+    fun `globalFallback and globalFallbackDrawable default to 0 and null`() {
+        assertEquals(0, AwImage.globalFallback)
+        assertNull(AwImage.globalFallbackDrawable)
     }
 }

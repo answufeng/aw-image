@@ -32,9 +32,11 @@ class AdvancedConfigActivity : AppCompatActivity() {
                 error(ColorDrawable(Color.parseColor("#FFFFCDD2")))
                 crossfade(500)
                 override(200, 200)
-                onStart { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading started..." }) }
-                onSuccess { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading succeeded!" }) }
-                onError { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading failed!" }) }
+                listener(
+                    onStart = { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading started..." }) },
+                    onSuccess = { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading succeeded!" }) },
+                    onError = { layout.addView(TextView(this@AdvancedConfigActivity).apply { text = "Loading failed!" }) }
+                )
             }
         })
 
