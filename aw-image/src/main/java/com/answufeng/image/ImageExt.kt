@@ -82,6 +82,7 @@ private fun resolveFallback(imageView: ImageView, scope: AwImageScope?) {
  * }
  * ```
  */
+@AwImageDsl
 class AwImageScope internal constructor(private val builder: ImageRequest.Builder) {
 
     private val transforms = mutableListOf<Transformation>()

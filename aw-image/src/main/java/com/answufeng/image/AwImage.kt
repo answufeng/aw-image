@@ -14,6 +14,9 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
+@DslMarker
+annotation class AwImageDsl
+
 /**
  * aw-image 图片加载库全局配置入口。
  *
@@ -293,6 +296,7 @@ object AwImage {
      *
      * 所有属性通过 setter 方法设置，外部不可直接赋值。
      */
+    @AwImageDsl
     class ImageConfig {
         /** 内存缓存占应用可用内存的比例（0.05~0.5） */
         var memoryCachePercent: Double = 0.25
