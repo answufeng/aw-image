@@ -59,6 +59,9 @@ object ImagePreloader {
     /**
      * 获取已缓存的图片 [Drawable]。
      *
+     * 与 [preload] 不同，此方法返回 [Drawable] 对象，可直接设置到 ImageView。
+     * 如果未命中缓存，会触发加载；加载失败返回 null。
+     *
      * 内部禁用硬件 Bitmap（`allowHardware(false)`），确保返回的 Drawable 可直接使用。
      *
      * @param context Context

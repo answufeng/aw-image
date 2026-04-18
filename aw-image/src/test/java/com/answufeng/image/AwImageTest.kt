@@ -53,6 +53,26 @@ class AwImageTest {
     }
 
     @Test
+    fun `ImageConfig enableSvg toggles`() {
+        val config = AwImage.ImageConfig()
+        assertFalse(config.svgEnabled)
+        config.enableSvg(true)
+        assertTrue(config.svgEnabled)
+    }
+
+    @Test
+    fun `ImageConfig crossfade global settings`() {
+        val config = AwImage.ImageConfig()
+        assertTrue(config.crossfadeEnabled)
+        assertEquals(200, config.crossfadeDuration)
+        config.crossfade(500)
+        assertEquals(500, config.crossfadeDuration)
+        assertTrue(config.crossfadeEnabled)
+        config.crossfade(false)
+        assertFalse(config.crossfadeEnabled)
+    }
+
+    @Test
     fun `ImageConfig placeholder and error setters with resId`() {
         val config = AwImage.ImageConfig()
         config.placeholder(123)

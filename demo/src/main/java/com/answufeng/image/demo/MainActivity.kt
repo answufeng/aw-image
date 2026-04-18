@@ -43,10 +43,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.btnShowCircle).setOnClickListener {
-            startActivity(Intent(this, AdvancedConfigActivity::class.java))
+            startActivity(Intent(this, AdvancedConfigActivity::class.java).apply {
+                putExtra("focus", "circle")
+            })
         }
         findViewById<MaterialButton>(R.id.btnShowRounded).setOnClickListener {
-            startActivity(Intent(this, AdvancedConfigActivity::class.java))
+            startActivity(Intent(this, AdvancedConfigActivity::class.java).apply {
+                putExtra("focus", "rounded")
+            })
         }
         findViewById<MaterialButton>(R.id.btnShowPlaceholder).setOnClickListener {
             startActivity(Intent(this, ErrorHandlingActivity::class.java))
@@ -63,13 +67,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.btnMemoryCache).setOnClickListener {
-            startActivity(Intent(this, CacheActivity::class.java))
+            startActivity(Intent(this, CacheActivity::class.java).apply {
+                putExtra("focus", "memory")
+            })
         }
         findViewById<MaterialButton>(R.id.btnDiskCache).setOnClickListener {
-            startActivity(Intent(this, CacheActivity::class.java))
+            startActivity(Intent(this, CacheActivity::class.java).apply {
+                putExtra("focus", "disk")
+            })
         }
         findViewById<MaterialButton>(R.id.btnClearCache).setOnClickListener {
-            startActivity(Intent(this, CacheActivity::class.java))
+            startActivity(Intent(this, CacheActivity::class.java).apply {
+                putExtra("focus", "clear")
+            })
         }
     }
 }
