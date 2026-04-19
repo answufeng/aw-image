@@ -25,6 +25,12 @@
 -keep public class com.answufeng.image.BlurTransformation {
     public *;
 }
+-keep public class com.answufeng.image.CropTransformation {
+    public *;
+}
+-keep public class com.answufeng.image.WatermarkTransformation {
+    public *;
+}
 
 -keepclassmembers class com.answufeng.image.ImageExtKt {
     public static ** loadImage(...);
@@ -34,3 +40,8 @@
     public static ** loadCircleWithBorder(...);
     public static ** loadBlur(...);
 }
+
+-keep class com.answufeng.image.Transformations { *; }
+
+# Coil (ships its own rules)
+-dontwarn coil.**

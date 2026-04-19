@@ -13,6 +13,7 @@ import coil.request.Disposable
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 @DslMarker
 annotation class AwImageDsl
@@ -89,7 +90,7 @@ object AwImage {
     /** 是否已调用 [init] */
     val isInitialized: Boolean get() = initialized
 
-    private val taggedDisposables = ConcurrentHashMap<Any, MutableList<Disposable>>()
+    private val taggedDisposables = ConcurrentHashMap<Any, CopyOnWriteArrayList<Disposable>>()
 
     /**
      * 初始化全局 ImageLoader。
@@ -242,7 +243,7 @@ object AwImage {
     /**
      * 检查指定数据源是否已缓存。
      *
-     * 同时检查内存缓存和磁盘缓存。
+     * 优先检查内存缓存，若未命中则检查磁盘缓存。
      *
      * @param context Context
      * @param data    图片数据源（URL / File / @DrawableRes 等）
@@ -253,7 +254,10 @@ object AwImage {
         return runCatching {
             val loader = imageLoader(context)
             val memoryKey = MemoryCache.Key(data, emptyList())
-            loader.memoryCache?.get(memoryKey) != null
+            if (loader.memoryCache?.get(memoryKey) != null) return@runCatching true
+            val diskKey = loader.defaults?.diskCacheKeyResolver?.fromData(data, loader.options)
+            if (diskKey != null && loader.diskCache?.get(diskKey) != null) return@runCatching true
+            false
         }.onFailure {
             AwLogger.e("isCached: failed for data=$data", it)
         }.getOrDefault(false)
@@ -281,7 +285,7 @@ object AwImage {
     }
 
     internal fun registerTaggedDisposable(tag: Any, disposable: Disposable) {
-        val list = taggedDisposables.getOrPut(tag) { mutableListOf() }
+        val list = taggedDisposables.computeIfAbsent(tag) { CopyOnWriteArrayList() }
         list.add(disposable)
         disposable.job.invokeOnCompletion { _ ->
             list.remove(disposable)
