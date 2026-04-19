@@ -41,7 +41,5 @@
     public static ** loadBlur(...);
 }
 
--keep class com.answufeng.image.Transformations { *; }
-
 # Coil (ships its own rules)
 -dontwarn coil.**

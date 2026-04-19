@@ -253,8 +253,7 @@ object AwImage {
     fun isCached(context: Context, data: Any): Boolean {
         return runCatching {
             val loader = imageLoader(context)
-            val memoryKey = MemoryCache.Key(data, emptyList())
-            if (loader.memoryCache?.get(memoryKey) != null) return@runCatching true
+            loader.memoryCache?.keys?.any { it.first == data } == true && return@runCatching true
             val diskKey = loader.defaults?.diskCacheKeyResolver?.fromData(data, loader.options)
             if (diskKey != null && loader.diskCache?.get(diskKey) != null) return@runCatching true
             false

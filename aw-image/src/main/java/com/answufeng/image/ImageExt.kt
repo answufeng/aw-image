@@ -340,8 +340,10 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
 
     internal fun registerProgressIfNeeded() {
         val callback = onProgressCallback ?: return
-        val url = builder.data?.toString() ?: return
-        ProgressInterceptor.register(url, callback)
+        val data = builder.data ?: return
+        if (data is String) {
+            ProgressInterceptor.register(data, callback)
+        }
     }
 
     internal val isCrossfadeExplicitlySet: Boolean get() = crossfadeExplicitlySet
