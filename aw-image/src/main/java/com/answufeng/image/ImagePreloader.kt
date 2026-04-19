@@ -68,7 +68,7 @@ object ImagePreloader {
      * @param data    图片数据源
      * @return 已缓存的 [Drawable]，未命中缓存或加载失败时返回 null
      */
-    suspend fun get(context: android.content.Context, data: Any): Drawable? {
+    suspend fun getDrawable(context: android.content.Context, data: Any): Drawable? {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
@@ -79,10 +79,14 @@ object ImagePreloader {
                 val result = Coil.imageLoader(appContext).execute(request)
                 (result as? SuccessResult)?.drawable
             }.onFailure {
-                AwLogger.e("get: failed for data=$data", it)
+                AwLogger.e("getDrawable: failed for data=$data", it)
             }.getOrNull()
         }
     }
+
+    /** @suppress 使用 [getDrawable] 替代 */
+    @Deprecated("Use getDrawable instead", ReplaceWith("getDrawable(context, data)"))
+    suspend fun get(context: android.content.Context, data: Any): Drawable? = getDrawable(context, data)
 
     /**
      * 批量预加载图片。

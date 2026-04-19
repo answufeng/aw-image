@@ -29,14 +29,16 @@ private fun ImageRequest.Builder.applyGlobalCrossfade() {
     }
 }
 
-private fun bindLifecycle(disposable: Disposable, owner: LifecycleOwner) {
+private fun bindLifecycle(disposable: Disposable, owner: LifecycleOwner, data: Any? = null) {
     if (owner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
         if (!disposable.isDisposed) disposable.dispose()
+        if (data is String) ProgressInterceptor.unregister(data)
         return
     }
     val observer = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_DESTROY && !disposable.isDisposed) {
-            disposable.dispose()
+        if (event == Lifecycle.Event.ON_DESTROY) {
+            if (!disposable.isDisposed) disposable.dispose()
+            if (data is String) ProgressInterceptor.unregister(data)
         }
     }
     owner.lifecycle.addObserver(observer)
@@ -166,11 +168,15 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     }
 
     /** 禁用内存和磁盘缓存 */
-    fun noCache() {
+    fun disableCache() {
         cacheDisabled = true
         builder.memoryCachePolicy(CachePolicy.DISABLED)
         builder.diskCachePolicy(CachePolicy.DISABLED)
     }
+
+    /** @suppress 使用 [disableCache] 替代 */
+    @Deprecated("Use disableCache instead", ReplaceWith("disableCache()"))
+    fun noCache() = disableCache()
 
     /**
      * 设置离线时是否仅使用缓存（默认 true）。
@@ -397,6 +403,7 @@ fun ImageView.loadImage(
     AwLogger.d("loadImage: data=$data")
 
     var tagValue: Any? = null
+    var lifecycleOwner: LifecycleOwner? = null
 
     val disposable = load(data) {
         val phDrawable = AwImage.globalPlaceholderDrawable
@@ -424,12 +431,14 @@ fun ImageView.loadImage(
             scope.applyTo(context)
             scope.registerProgressIfNeeded()
             tagValue = scope.tagValue
-            scope.lifecycleOwner?.let { owner ->
-                bindLifecycle(disposable, owner)
-            }
+            lifecycleOwner = scope.lifecycleOwner
         } else {
             applyGlobalCrossfade()
         }
+    }
+
+    lifecycleOwner?.let { owner ->
+        bindLifecycle(disposable, owner, data)
     }
 
     if (tagValue != null) {
