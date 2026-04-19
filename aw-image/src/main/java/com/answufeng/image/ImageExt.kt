@@ -227,7 +227,7 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
      * ```kotlin
      * imageView.loadImage(url) { tag("feed_list") }
      * // 退出页面时批量取消
-     * AwImage.cancelByTag(context, "feed_list")
+     * AwImage.cancelByTag("feed_list")
      * ```
      */
     fun tag(key: Any) {
