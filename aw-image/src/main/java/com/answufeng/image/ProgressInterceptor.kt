@@ -8,6 +8,13 @@ import okio.Source
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * 图片加载进度拦截器
+ *
+ * 用于监听图片加载的进度，通过 OkHttp Interceptor 实现
+ *
+ * @see Interceptor
+ */
 internal object ProgressInterceptor : Interceptor {
 
     private val listeners = ConcurrentHashMap<String, (Long, Long) -> Unit>()

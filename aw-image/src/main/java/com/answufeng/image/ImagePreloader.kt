@@ -48,10 +48,10 @@ object ImagePreloader {
                     .build()
                 val result = Coil.imageLoader(appContext).execute(request)
                 val success = result is SuccessResult
-                AwLogger.d("preload: data=$data, success=$success")
+                AwImageLogger.d("preload: data=$data, success=$success")
                 success
             }.onFailure {
-                AwLogger.e("preload: failed for data=$data", it)
+                AwImageLogger.e("preload: failed for data=$data", it)
             }.getOrDefault(false)
         }
     }
@@ -79,7 +79,7 @@ object ImagePreloader {
                 val result = Coil.imageLoader(appContext).execute(request)
                 (result as? SuccessResult)?.drawable
             }.onFailure {
-                AwLogger.e("getDrawable: failed for data=$data", it)
+                AwImageLogger.e("getDrawable: failed for data=$data", it)
             }.getOrNull()
         }
     }
@@ -107,7 +107,7 @@ object ImagePreloader {
     ): List<Boolean> {
         require(concurrency >= 1) { "concurrency must be >= 1, got $concurrency" }
         val appContext = context.applicationContext
-        AwLogger.d("preloadAll: ${urls.size} URLs, concurrency=$concurrency")
+        AwImageLogger.d("preloadAll: ${urls.size} URLs, concurrency=$concurrency")
         val semaphore = Semaphore(concurrency)
         return coroutineScope {
             urls.map { url ->

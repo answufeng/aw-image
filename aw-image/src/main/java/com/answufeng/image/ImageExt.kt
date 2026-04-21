@@ -313,8 +313,8 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         }
         if (transforms.isNotEmpty()) builder.transformations(transforms)
 
-        if (!cacheDisabled && !memoryCacheOnlyEnabled && offlineCacheEnabled && !NetworkMonitor.isConnected(context)) {
-            AwLogger.d("loadImage: offline, using cache-only policy")
+        if (!cacheDisabled && !memoryCacheOnlyEnabled && offlineCacheEnabled && !ImageNetworkMonitor.isConnected(context)) {
+            AwImageLogger.d("loadImage: offline, using cache-only policy")
             builder.networkCachePolicy(CachePolicy.DISABLED)
         }
 
@@ -325,17 +325,17 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         if (hasStart || hasSuccess || hasError || hasProgress) {
             builder.listener(
                 onStart = {
-                    AwLogger.d("loadImage: onStart")
+                    AwImageLogger.d("loadImage: onStart")
                     onStartCallback?.invoke()
                 },
                 onSuccess = { _, result ->
-                    AwLogger.d("loadImage: onSuccess")
+                    AwImageLogger.d("loadImage: onSuccess")
                     val url = result.request.data?.toString()
                     if (url != null) ProgressInterceptor.unregister(url)
                     onSuccessCallback?.invoke(result)
                 },
                 onError = { _, result ->
-                    AwLogger.e("loadImage: onError - ${result.throwable.message}")
+                    AwImageLogger.e("loadImage: onError - ${result.throwable.message}")
                     val url = result.request.data?.toString()
                     if (url != null) ProgressInterceptor.unregister(url)
                     onErrorCallback?.invoke(result)
@@ -390,7 +390,7 @@ fun ImageView.loadImage(
     config: (AwImageScope.() -> Unit)? = null
 ): Disposable {
     if (data == null) {
-        AwLogger.d("loadImage: data is null, showing fallback/error")
+        AwImageLogger.d("loadImage: data is null, showing fallback/error")
         val scope = if (config != null) {
             AwImageScope(ImageRequest.Builder(context)).apply(config)
         } else {
@@ -400,7 +400,7 @@ fun ImageView.loadImage(
         return EMPTY_DISPOSABLE
     }
 
-    AwLogger.d("loadImage: data=$data")
+    AwImageLogger.d("loadImage: data=$data")
 
     var tagValue: Any? = null
     var lifecycleOwner: LifecycleOwner? = null

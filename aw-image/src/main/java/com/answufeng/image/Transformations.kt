@@ -263,7 +263,7 @@ internal object RenderEffectBlur {
             canvas.drawBitmap(input, 0f, 0f, paint)
             output
         }.onFailure {
-            AwLogger.e("RenderEffectBlur: failed, falling back to StackBlur", it)
+            AwImageLogger.e("RenderEffectBlur: failed, falling back to StackBlur", it)
         }.getOrNull()
     }
 }

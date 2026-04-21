@@ -34,7 +34,7 @@
 │  (直接操作 Coil ImageRequest.Builder)    │
 ├─────────────────────────────────────────┤
 │  AwImage (全局配置)  ImagePreloader      │  ← 全局管理层
-│  NetworkMonitor       AwLogger          │
+│  ImageNetworkMonitor       AwImageLogger          │
 ├─────────────────────────────────────────┤
 │  Grayscale / ColorFilter / Border /     │  ← 变换层
 │  Blur (StackBlur + RenderEffect)        │

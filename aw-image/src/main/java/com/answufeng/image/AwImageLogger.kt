@@ -12,7 +12,7 @@ import android.util.Log
  * }
  * ```
  */
-internal object AwLogger {
+internal object AwImageLogger {
 
     /** 是否启用日志输出 */
     @Volatile

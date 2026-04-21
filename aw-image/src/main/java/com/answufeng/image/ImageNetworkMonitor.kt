@@ -13,7 +13,7 @@ import android.net.NetworkCapabilities
  *
  * 首次调用 [isConnected] 时自动注册回调，后续调用直接读取缓存值。
  */
-internal object NetworkMonitor {
+internal object ImageNetworkMonitor {
 
     @Volatile
     private var connected: Boolean = false

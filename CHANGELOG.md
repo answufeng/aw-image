@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance**: `BlurTransformation` 的 RenderEffect 从反射调用改为直接 SDK API，API 31+ 模糊性能提升 ~30%
 - **Performance**: StackBlur 消除 `IntArray(1)` 指针模拟，改用局部变量，代码可读性大幅提升
 - **Performance**: StackBlur 的 `vMin` 数组通过 `ThreadLocal` 复用，减少临时内存分配
-- **Performance**: `NetworkMonitor` 缓存网络状态到 `@Volatile` 变量 + 注册 `NetworkCallback` 实时更新，批量加载时网络查询从 O(n) 系统调用降为 O(1) 变量读取
+- **Performance**: `ImageNetworkMonitor` 缓存网络状态到 `@Volatile` 变量 + 注册 `NetworkCallback` 实时更新，批量加载时网络查询从 O(n) 系统调用降为 O(1) 变量读取
 - **Refactor**: `loadImage` 中 `data==null` 的 fallback 逻辑提取为 `resolveFallback` 方法，消除重复代码
 
 ### Added
@@ -67,10 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fallback support**: `fallback(resId)` in `ImageLoadConfig` for null data
 - **Disk cache directory**: `diskCacheDir(File)` in `ImageConfig`
 - **Memory cache size**: `memoryCacheMaxSize(bytes)` in `ImageConfig`
-- **Logging**: `AwLogger` with `enableLogging(Boolean)` in `ImageConfig`
+- **Logging**: `AwImageLogger` with `enableLogging(Boolean)` in `ImageConfig`
 - **RenderEffect blur**: `BlurTransformation` uses hardware-accelerated `RenderEffect` on API 31+ (reflection-based, compatible with all compileSdk)
 - **Offline smart cache**: `cacheOnlyOnOffline(Boolean)` in `ImageLoadConfig` — automatically disables network requests when offline
-- **NetworkMonitor**: Internal connectivity detection using `ConnectivityManager` with `NET_CAPABILITY_VALIDATED`
+- **ImageNetworkMonitor**: Internal connectivity detection using `ConnectivityManager` with `NET_CAPABILITY_VALIDATED`
 - **Demo XML layouts**: `CacheActivity` and `ErrorHandlingActivity` now use XML layouts
 - **ImagePreloader test**: Basic method existence tests
 - **Demo**: `CacheActivity` now uses coroutines instead of `Thread`

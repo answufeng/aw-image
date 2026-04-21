@@ -105,7 +105,7 @@ object AwImage {
         val appContext = context.applicationContext
         val imageConfig = ImageConfig().apply { config?.invoke(this) }
 
-        AwLogger.d("AwImage.init: memoryCache=${imageConfig.memoryCachePercent}, " +
+        AwImageLogger.d("AwImage.init: memoryCache=${imageConfig.memoryCachePercent}, " +
                 "diskCache=${imageConfig.diskCacheSize}, gif=${imageConfig.gifEnabled}")
 
         val builder = ImageLoader.Builder(appContext)
@@ -173,7 +173,7 @@ object AwImage {
         val imageLoader = builder.build()
         Coil.setImageLoader(imageLoader)
         initialized = true
-        AwLogger.d("AwImage.init: complete")
+        AwImageLogger.d("AwImage.init: complete")
         return imageLoader
     }
 
@@ -190,9 +190,9 @@ object AwImage {
     fun clearMemoryCache(context: Context): Boolean {
         return runCatching {
             imageLoader(context).memoryCache?.clear()
-            AwLogger.d("clearMemoryCache: success")
+            AwImageLogger.d("clearMemoryCache: success")
         }.onFailure {
-            AwLogger.e("clearMemoryCache: failed", it)
+            AwImageLogger.e("clearMemoryCache: failed", it)
         }.isSuccess
     }
 
@@ -207,9 +207,9 @@ object AwImage {
     fun clearDiskCache(context: Context): Boolean {
         return runCatching {
             imageLoader(context).diskCache?.clear()
-            AwLogger.d("clearDiskCache: success")
+            AwImageLogger.d("clearDiskCache: success")
         }.onFailure {
-            AwLogger.e("clearDiskCache: failed", it)
+            AwImageLogger.e("clearDiskCache: failed", it)
         }.isSuccess
     }
 
@@ -222,7 +222,7 @@ object AwImage {
         return runCatching {
             imageLoader(context).memoryCache?.size?.toLong() ?: 0L
         }.onFailure {
-            AwLogger.e("getMemoryCacheSize: failed", it)
+            AwImageLogger.e("getMemoryCacheSize: failed", it)
         }.getOrDefault(0L)
     }
 
@@ -236,7 +236,7 @@ object AwImage {
         return runCatching {
             imageLoader(context).diskCache?.size ?: 0L
         }.onFailure {
-            AwLogger.e("getDiskCacheSize: failed", it)
+            AwImageLogger.e("getDiskCacheSize: failed", it)
         }.getOrDefault(0L)
     }
 
@@ -258,7 +258,7 @@ object AwImage {
             if (diskKey != null && loader.diskCache?.get(diskKey) != null) return@runCatching true
             false
         }.onFailure {
-            AwLogger.e("isCached: failed for data=$data", it)
+            AwImageLogger.e("isCached: failed for data=$data", it)
         }.getOrDefault(false)
     }
 
@@ -280,7 +280,7 @@ object AwImage {
         for (d in disposables) {
             if (!d.isDisposed) d.dispose()
         }
-        AwLogger.d("cancelByTag: cancelled ${disposables.size} requests for tag=$tag")
+        AwImageLogger.d("cancelByTag: cancelled ${disposables.size} requests for tag=$tag")
     }
 
     internal fun registerTaggedDisposable(tag: Any, disposable: Disposable) {
@@ -412,6 +412,6 @@ object AwImage {
         fun okHttpClient(client: OkHttpClient) { okHttpClient = client }
 
         /** 设置是否启用调试日志（默认 false） */
-        fun enableLogging(enabled: Boolean) { AwLogger.enabled = enabled }
+        fun enableLogging(enabled: Boolean) { AwImageLogger.enabled = enabled }
     }
 }
