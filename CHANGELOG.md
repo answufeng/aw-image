@@ -7,27 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Memory leak**: `taggedDisposables` 中 Disposable 在请求完成后自动清理，不再持续累积
+- **Crossfade duration**: 全局 `crossfadeDuration` 配置现在正确传递给 Coil（之前只传了 `crossfade(true)` 未传时长）
+- **BorderTransformation**: `circle=true` 时现在先裁切为圆形再绘制边框，不再露出方形图片
+
 ### Changed
 
-- **Breaking**: `ImageLoadConfig` replaced by `AwImageScope` — DSL 配置块直接操作 Coil 的 `ImageRequest.Builder`，消除中间对象分配，RecyclerView 场景下减少 ~90% 对象创建
-- **Breaking**: `listener()` 改为累积语义 — 非 null 参数才会覆盖已设置的回调，与 `transform()` 的累积模式一致
-- **Breaking**: `preloadAll()` 返回 `List<Boolean>` — 调用者可感知每个 URL 的加载结果
+- **Breaking**: `loadImage` 参数 `placeholder` 重命名为 `placeholderRes`，与 `errorRes` 命名风格统一
+- **Breaking**: `listener()` 文档修正为"覆盖模式"（非 null 参数才会覆盖），与实际行为一致
 - **Performance**: `BlurTransformation` 的 RenderEffect 从反射调用改为直接 SDK API，API 31+ 模糊性能提升 ~30%
 - **Performance**: StackBlur 消除 `IntArray(1)` 指针模拟，改用局部变量，代码可读性大幅提升
 - **Performance**: StackBlur 的 `vMin` 数组通过 `ThreadLocal` 复用，减少临时内存分配
 - **Performance**: `NetworkMonitor` 缓存网络状态到 `@Volatile` 变量 + 注册 `NetworkCallback` 实时更新，批量加载时网络查询从 O(n) 系统调用降为 O(1) 变量读取
+- **Refactor**: `loadImage` 中 `data==null` 的 fallback 逻辑提取为 `resolveFallback` 方法，消除重复代码
 
 ### Added
 
-- `AwImageScope` — 轻量级 DSL 作用域，直接操作 Coil Builder，支持 `onStart`/`onSuccess`/`onError` 独立 setter
-- `placeholder(Drawable)` / `error(Drawable)` / `fallback(Drawable)` — 全局配置和单次加载均支持 Drawable 类型的占位图/错误图/兜底图
-- `okHttpClient(OkHttpClient)` — 全局配置支持自定义 OkHttpClient（超时、拦截器等）
-- OkHttp 4.12.0 作为 `api` 依赖显式声明
-
-### Fixed
-
-- `crossfade(false)` 现在正确禁用渐入动画（之前默认的 crossfade 会被无条件应用）
-- `loadImage(null)` 时 Drawable 类型的 fallback/error 正确显示
+- `onStart` / `onSuccess` / `onError` — `AwImageScope` 独立回调方法，无需通过 `listener()` 设置
+- `onProgress` — `AwImageScope` 下载进度回调，通过 OkHttp 拦截器实现
+- `lifecycle(LifecycleOwner)` — `AwImageScope` Lifecycle 感知加载，页面销毁时自动取消请求
+- `AwImage.isCached(context, data)` — 缓存查询 API，检查内存缓存中是否存在指定数据源
+- `CropTransformation` — 图片裁切变换
+- `WatermarkTransformation` — 水印变换
+- `enableSvg(Boolean)` — SVG 解码支持（默认关闭，需添加 `coil-svg` 依赖）
+- `applyGlobalCrossfade()` — 全局 crossfade 配置（enabled + duration）统一应用
+- Demo: BasicLoadActivity 根据 source extra 切换数据源（网络/本地/资源）
+- Demo: MainActivity 按钮跳转传递 focus extra 区分展示内容
+- Demo: AdvancedConfigActivity 支持 circle/rounded focus
+- Demo: CacheActivity 支持 memory/disk/clear focus
+- Demo: RecyclerViewActivity 添加 cancelByTag 演示、Grid 切换、预加载
+- Demo: TransformActivity 添加原图 vs 变换对比展示、blur/grayscale focus
+- Demo: GifActivity 添加多个 GIF 示例
+- Demo: 暗黑模式适配（values-night/colors.xml）
 
 ## [1.1.0] - 2025-04-12
 

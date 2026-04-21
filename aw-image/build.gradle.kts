@@ -34,6 +34,7 @@ android {
 dependencies {
     api(libs.coil)
     api(libs.coil.gif)
+    implementation(libs.coil.svg)
     api(libs.okhttp)
     implementation(libs.core.ktx)
     implementation(libs.appcompat)

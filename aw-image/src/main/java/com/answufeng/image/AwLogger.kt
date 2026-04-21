@@ -15,6 +15,7 @@ import android.util.Log
 internal object AwLogger {
 
     /** 是否启用日志输出 */
+    @Volatile
     var enabled: Boolean = false
 
     /** 日志 Tag */

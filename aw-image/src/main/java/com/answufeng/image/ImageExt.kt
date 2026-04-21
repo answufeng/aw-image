@@ -3,6 +3,9 @@ package com.answufeng.image
 import android.graphics.drawable.Drawable
 import android.util.TypedValue
 import android.widget.ImageView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import coil.load
 import coil.request.CachePolicy
 import coil.request.Disposable
@@ -18,6 +21,44 @@ private val EMPTY_DISPOSABLE = object : Disposable {
         cancel()
     }
     override fun dispose() {}
+}
+
+private fun ImageRequest.Builder.applyGlobalCrossfade() {
+    if (AwImage.globalCrossfadeEnabled) {
+        crossfade(AwImage.globalCrossfadeDuration)
+    }
+}
+
+private fun bindLifecycle(disposable: Disposable, owner: LifecycleOwner, data: Any? = null) {
+    if (owner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
+        if (!disposable.isDisposed) disposable.dispose()
+        if (data is String) ProgressInterceptor.unregister(data)
+        return
+    }
+    val observer = LifecycleEventObserver { _, event ->
+        if (event == Lifecycle.Event.ON_DESTROY) {
+            if (!disposable.isDisposed) disposable.dispose()
+            if (data is String) ProgressInterceptor.unregister(data)
+        }
+    }
+    owner.lifecycle.addObserver(observer)
+    disposable.job.invokeOnCompletion {
+        owner.lifecycle.removeObserver(observer)
+    }
+}
+
+private fun resolveFallback(imageView: ImageView, scope: AwImageScope?) {
+    val fbDrawable = scope?.fallbackDrawable
+    val fbRes = scope?.fallbackResId ?: 0
+    when {
+        fbDrawable != null -> imageView.setImageDrawable(fbDrawable)
+        fbRes != 0 -> imageView.setImageResource(fbRes)
+        AwImage.globalFallbackDrawable != null -> imageView.setImageDrawable(AwImage.globalFallbackDrawable)
+        AwImage.globalFallback != 0 -> imageView.setImageResource(AwImage.globalFallback)
+        AwImage.globalErrorDrawable != null -> imageView.setImageDrawable(AwImage.globalErrorDrawable)
+        AwImage.globalError != 0 -> imageView.setImageResource(AwImage.globalError)
+        else -> imageView.setImageResource(0)
+    }
 }
 
 /**
@@ -43,6 +84,7 @@ private val EMPTY_DISPOSABLE = object : Disposable {
  * }
  * ```
  */
+@AwImageDsl
 class AwImageScope internal constructor(private val builder: ImageRequest.Builder) {
 
     private val transforms = mutableListOf<Transformation>()
@@ -54,6 +96,8 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     private var crossfadeExplicitlySet = false
     internal var tagValue: Any? = null
         private set
+    internal var lifecycleOwner: LifecycleOwner? = null
+        private set
 
     internal var fallbackResId: Int = 0
         private set
@@ -63,6 +107,8 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     private var onStartCallback: (() -> Unit)? = null
     private var onSuccessCallback: ((coil.request.SuccessResult) -> Unit)? = null
     private var onErrorCallback: ((coil.request.ErrorResult) -> Unit)? = null
+    internal var onProgressCallback: ((Long, Long) -> Unit)? = null
+        private set
 
     /** 设置占位图资源 ID */
     fun placeholder(res: Int) {
@@ -122,11 +168,15 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     }
 
     /** 禁用内存和磁盘缓存 */
-    fun noCache() {
+    fun disableCache() {
         cacheDisabled = true
         builder.memoryCachePolicy(CachePolicy.DISABLED)
         builder.diskCachePolicy(CachePolicy.DISABLED)
     }
+
+    /** @suppress 使用 [disableCache] 替代 */
+    @Deprecated("Use disableCache instead", ReplaceWith("disableCache()"))
+    fun noCache() = disableCache()
 
     /**
      * 设置离线时是否仅使用缓存（默认 true）。
@@ -183,7 +233,7 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
      * ```kotlin
      * imageView.loadImage(url) { tag("feed_list") }
      * // 退出页面时批量取消
-     * AwImage.cancelByTag(context, "feed_list")
+     * AwImage.cancelByTag("feed_list")
      * ```
      */
     fun tag(key: Any) {
@@ -192,7 +242,20 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     }
 
     /**
-     * 设置加载状态监听器（累积模式，非 null 参数才会覆盖已设置的回调）。
+     * 绑定 [LifecycleOwner]，在 Lifecycle DESTROYED 时自动取消请求。
+     *
+     * ```kotlin
+     * imageView.loadImage(url) {
+     *     lifecycle(this@MyActivity)
+     * }
+     * ```
+     */
+    fun lifecycle(owner: LifecycleOwner) {
+        lifecycleOwner = owner
+    }
+
+    /**
+     * 设置加载状态监听器（覆盖模式，非 null 参数才会覆盖已设置的回调）。
      *
      * ```kotlin
      * listener(
@@ -210,6 +273,30 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         onStart?.let { onStartCallback = it }
         onSuccess?.let { onSuccessCallback = it }
         onError?.let { onErrorCallback = it }
+    }
+
+    /** 设置加载开始回调 */
+    fun onStart(action: () -> Unit) {
+        onStartCallback = action
+    }
+
+    /** 设置加载成功回调 */
+    fun onSuccess(action: (coil.request.SuccessResult) -> Unit) {
+        onSuccessCallback = action
+    }
+
+    /** 设置加载失败回调 */
+    fun onError(action: (coil.request.ErrorResult) -> Unit) {
+        onErrorCallback = action
+    }
+
+    /**
+     * 设置下载进度回调。
+     *
+     * @param action 回调参数为 (currentBytes, totalBytes)，totalBytes 为 -1 时表示未知
+     */
+    fun onProgress(action: (currentBytes: Long, totalBytes: Long) -> Unit) {
+        onProgressCallback = action
     }
 
     internal fun applyTo(context: android.content.Context) {
@@ -234,7 +321,8 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
         val hasStart = onStartCallback != null
         val hasSuccess = onSuccessCallback != null
         val hasError = onErrorCallback != null
-        if (hasStart || hasSuccess || hasError) {
+        val hasProgress = onProgressCallback != null
+        if (hasStart || hasSuccess || hasError || hasProgress) {
             builder.listener(
                 onStart = {
                     AwLogger.d("loadImage: onStart")
@@ -242,13 +330,25 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
                 },
                 onSuccess = { _, result ->
                     AwLogger.d("loadImage: onSuccess")
+                    val url = result.request.data?.toString()
+                    if (url != null) ProgressInterceptor.unregister(url)
                     onSuccessCallback?.invoke(result)
                 },
                 onError = { _, result ->
                     AwLogger.e("loadImage: onError - ${result.throwable.message}")
+                    val url = result.request.data?.toString()
+                    if (url != null) ProgressInterceptor.unregister(url)
                     onErrorCallback?.invoke(result)
                 },
             )
+        }
+    }
+
+    internal fun registerProgressIfNeeded() {
+        val callback = onProgressCallback ?: return
+        val data = builder.data ?: return
+        if (data is String) {
+            ProgressInterceptor.register(data, callback)
         }
     }
 
@@ -266,7 +366,7 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
  * imageView.loadImage("https://example.com/photo.jpg")
  *
  * // 带常用参数
- * imageView.loadImage(url, placeholder = R.drawable.loading, errorRes = R.drawable.fail)
+ * imageView.loadImage(url, placeholderRes = R.drawable.loading, errorRes = R.drawable.fail)
  *
  * // 带完整配置
  * imageView.loadImage(url) {
@@ -277,55 +377,39 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
  * }
  * ```
  *
- * @param data        图片数据源，为 null 时显示 fallback 或全局错误图
- * @param placeholder 占位图资源 ID（0 表示不设置，使用全局配置）
- * @param errorRes    错误图资源 ID（0 表示不设置，使用全局配置）
- * @param config      可选的 [AwImageScope] DSL 配置块
+ * @param data           图片数据源，为 null 时显示 fallback 或全局错误图
+ * @param placeholderRes 占位图资源 ID（0 表示不设置，使用全局配置）
+ * @param errorRes       错误图资源 ID（0 表示不设置，使用全局配置）
+ * @param config         可选的 [AwImageScope] DSL 配置块
  * @return [Disposable]，始终非 null
  */
 fun ImageView.loadImage(
     data: Any?,
-    placeholder: Int = 0,
+    placeholderRes: Int = 0,
     errorRes: Int = 0,
     config: (AwImageScope.() -> Unit)? = null
 ): Disposable {
     if (data == null) {
         AwLogger.d("loadImage: data is null, showing fallback/error")
-        if (config != null) {
-            val scope = AwImageScope(ImageRequest.Builder(context))
-            scope.config()
-            val fbDrawable = scope.fallbackDrawable
-            val fbRes = scope.fallbackResId
-            when {
-                fbDrawable != null -> setImageDrawable(fbDrawable)
-                fbRes != 0 -> setImageResource(fbRes)
-                AwImage.globalFallbackDrawable != null -> setImageDrawable(AwImage.globalFallbackDrawable)
-                AwImage.globalFallback != 0 -> setImageResource(AwImage.globalFallback)
-                AwImage.globalErrorDrawable != null -> setImageDrawable(AwImage.globalErrorDrawable)
-                AwImage.globalError != 0 -> setImageResource(AwImage.globalError)
-                else -> setImageResource(0)
-            }
+        val scope = if (config != null) {
+            AwImageScope(ImageRequest.Builder(context)).apply(config)
         } else {
-            when {
-                AwImage.globalFallbackDrawable != null -> setImageDrawable(AwImage.globalFallbackDrawable)
-                AwImage.globalFallback != 0 -> setImageResource(AwImage.globalFallback)
-                AwImage.globalErrorDrawable != null -> setImageDrawable(AwImage.globalErrorDrawable)
-                AwImage.globalError != 0 -> setImageResource(AwImage.globalError)
-                else -> setImageResource(0)
-            }
+            null
         }
+        resolveFallback(this, scope)
         return EMPTY_DISPOSABLE
     }
 
     AwLogger.d("loadImage: data=$data")
 
     var tagValue: Any? = null
+    var lifecycleOwner: LifecycleOwner? = null
 
     val disposable = load(data) {
         val phDrawable = AwImage.globalPlaceholderDrawable
         val phRes = AwImage.globalPlaceholder
         when {
-            placeholder != 0 -> placeholder(placeholder)
+            placeholderRes != 0 -> placeholder(placeholderRes)
             phDrawable != null -> placeholder(phDrawable)
             phRes != 0 -> placeholder(phRes)
         }
@@ -342,13 +426,19 @@ fun ImageView.loadImage(
             val scope = AwImageScope(this)
             scope.config()
             if (!scope.isCrossfadeExplicitlySet) {
-                crossfade(true)
+                applyGlobalCrossfade()
             }
             scope.applyTo(context)
+            scope.registerProgressIfNeeded()
             tagValue = scope.tagValue
+            lifecycleOwner = scope.lifecycleOwner
         } else {
-            crossfade(true)
+            applyGlobalCrossfade()
         }
+    }
+
+    lifecycleOwner?.let { owner ->
+        bindLifecycle(disposable, owner, data)
     }
 
     if (tagValue != null) {

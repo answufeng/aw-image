@@ -23,6 +23,8 @@ class CacheActivity : AppCompatActivity() {
 
         refreshCacheSizes(tvMemSize, tvDiskSize)
 
+        val focus = intent.getStringExtra("focus")
+
         findViewById<Button>(R.id.btnClearMemory).setOnClickListener {
             val result = AwImage.clearMemoryCache(this)
             tvResult.text = "内存缓存已清除: $result"
@@ -36,6 +38,25 @@ class CacheActivity : AppCompatActivity() {
                 }
                 tvResult.text = "磁盘缓存已清除: $result"
                 refreshCacheSizes(tvMemSize, tvDiskSize)
+            }
+        }
+
+        when (focus) {
+            "memory" -> {
+                tvResult.text = "点击「清除内存缓存」按钮查看效果"
+            }
+            "disk" -> {
+                tvResult.text = "点击「清除磁盘缓存」按钮查看效果"
+            }
+            "clear" -> {
+                lifecycleScope.launch {
+                    val memResult = AwImage.clearMemoryCache(this@CacheActivity)
+                    val diskResult = withContext(Dispatchers.IO) {
+                        AwImage.clearDiskCache(this@CacheActivity)
+                    }
+                    tvResult.text = "全部缓存已清除: 内存=$memResult, 磁盘=$diskResult"
+                    refreshCacheSizes(tvMemSize, tvDiskSize)
+                }
             }
         }
     }

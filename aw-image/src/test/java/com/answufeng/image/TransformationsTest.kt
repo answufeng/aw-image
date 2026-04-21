@@ -82,4 +82,25 @@ class TransformationsTest {
     fun `BorderTransformation rejects negative width`() {
         BorderTransformation(borderWidth = -1f, borderColor = 0)
     }
+
+    @Test
+    fun `CropTransformation cacheKey includes params`() {
+        val t = CropTransformation(10, 20, 100, 200)
+        assertEquals("aw_crop_10_20_100_200", t.cacheKey)
+    }
+
+    @Test
+    fun `CropTransformation default values`() {
+        val t = CropTransformation()
+        assertEquals("aw_crop_0_0_0_0", t.cacheKey)
+    }
+
+    @Test
+    fun `WatermarkTransformation cacheKey includes params`() {
+        val bitmap = android.graphics.Bitmap.createBitmap(10, 10, android.graphics.Bitmap.Config.ARGB_8888)
+        val t = WatermarkTransformation(bitmap, 5, 10, 128)
+        assertTrue(t.cacheKey.startsWith("aw_watermark_"))
+        assertTrue(t.cacheKey.contains("_5_10_128"))
+        bitmap.recycle()
+    }
 }

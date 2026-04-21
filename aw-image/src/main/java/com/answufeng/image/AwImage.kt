@@ -13,6 +13,10 @@ import coil.request.Disposable
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+
+@DslMarker
+annotation class AwImageDsl
 
 /**
  * aw-image 图片加载库全局配置入口。
@@ -70,13 +74,23 @@ object AwImage {
     internal var globalFallbackDrawable: Drawable? = null
         private set
 
+    /** 全局是否启用渐入动画 */
+    @Volatile
+    internal var globalCrossfadeEnabled: Boolean = true
+        private set
+
+    /** 全局渐入动画时长（ms） */
+    @Volatile
+    internal var globalCrossfadeDuration: Int = 200
+        private set
+
     @Volatile
     private var initialized = false
 
     /** 是否已调用 [init] */
     val isInitialized: Boolean get() = initialized
 
-    private val taggedDisposables = ConcurrentHashMap<Any, MutableList<Disposable>>()
+    private val taggedDisposables = ConcurrentHashMap<Any, CopyOnWriteArrayList<Disposable>>()
 
     /**
      * 初始化全局 ImageLoader。
@@ -128,7 +142,24 @@ object AwImage {
             }
         }
 
-        imageConfig.okHttpClient?.let { builder.okHttpClient(it) }
+        if (imageConfig.svgEnabled) {
+            builder.components {
+                add(coil.decode.SvgDecoder.Factory())
+            }
+        }
+
+        imageConfig.okHttpClient?.let { client ->
+            val enhancedClient = client.newBuilder()
+                .addInterceptor(ProgressInterceptor)
+                .build()
+            builder.okHttpClient(enhancedClient)
+        } ?: run {
+            builder.okHttpClient(
+                okhttp3.OkHttpClient.Builder()
+                    .addInterceptor(ProgressInterceptor)
+                    .build()
+            )
+        }
 
         globalPlaceholder = imageConfig.placeholderRes
         globalPlaceholderDrawable = imageConfig.placeholderDrawable?.constantState?.newDrawable()?.mutate()
@@ -136,6 +167,8 @@ object AwImage {
         globalErrorDrawable = imageConfig.errorDrawable?.constantState?.newDrawable()?.mutate()
         globalFallback = imageConfig.fallbackRes
         globalFallbackDrawable = imageConfig.fallbackDrawable?.constantState?.newDrawable()?.mutate()
+        globalCrossfadeEnabled = imageConfig.crossfadeEnabled
+        globalCrossfadeDuration = imageConfig.crossfadeDuration
 
         val imageLoader = builder.build()
         Coil.setImageLoader(imageLoader)
@@ -208,6 +241,28 @@ object AwImage {
     }
 
     /**
+     * 检查指定数据源是否已缓存。
+     *
+     * 优先检查内存缓存，若未命中则检查磁盘缓存。
+     *
+     * @param context Context
+     * @param data    图片数据源（URL / File / @DrawableRes 等）
+     * @return `true` 表示已缓存，`false` 表示未缓存或查询失败
+     */
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
+    fun isCached(context: Context, data: Any): Boolean {
+        return runCatching {
+            val loader = imageLoader(context)
+            loader.memoryCache?.keys?.any { it.first == data } == true && return@runCatching true
+            val diskKey = loader.defaults?.diskCacheKeyResolver?.fromData(data, loader.options)
+            if (diskKey != null && loader.diskCache?.get(diskKey) != null) return@runCatching true
+            false
+        }.onFailure {
+            AwLogger.e("isCached: failed for data=$data", it)
+        }.getOrDefault(false)
+    }
+
+    /**
      * 取消指定标签的所有图片加载请求。
      *
      * ```kotlin
@@ -215,11 +270,10 @@ object AwImage {
      * imageView.loadImage(url) { tag("feed_list") }
      *
      * // 退出页面时批量取消
-     * AwImage.cancelByTag(context, "feed_list")
+     * AwImage.cancelByTag("feed_list")
      * ```
      *
-     * @param context Context
-     * @param tag     请求标签
+     * @param tag 请求标签
      */
     fun cancelByTag(tag: Any) {
         val disposables = taggedDisposables.remove(tag) ?: return
@@ -230,7 +284,14 @@ object AwImage {
     }
 
     internal fun registerTaggedDisposable(tag: Any, disposable: Disposable) {
-        taggedDisposables.getOrPut(tag) { mutableListOf() }.add(disposable)
+        val list = taggedDisposables.computeIfAbsent(tag) { CopyOnWriteArrayList() }
+        list.add(disposable)
+        disposable.job.invokeOnCompletion { _ ->
+            list.remove(disposable)
+            if (list.isEmpty()) {
+                taggedDisposables.remove(tag, list)
+            }
+        }
     }
 
     /**
@@ -238,6 +299,7 @@ object AwImage {
      *
      * 所有属性通过 setter 方法设置，外部不可直接赋值。
      */
+    @AwImageDsl
     class ImageConfig {
         /** 内存缓存占应用可用内存的比例（0.05~0.5） */
         var memoryCachePercent: Double = 0.25
@@ -265,6 +327,10 @@ object AwImage {
 
         /** 是否启用 GIF 解码 */
         var gifEnabled: Boolean = true
+            private set
+
+        /** 是否启用 SVG 解码 */
+        var svgEnabled: Boolean = false
             private set
 
         /** 全局占位图资源 ID */
@@ -320,6 +386,9 @@ object AwImage {
 
         /** 设置是否启用 GIF 解码 */
         fun enableGif(enabled: Boolean) { gifEnabled = enabled }
+
+        /** 设置是否启用 SVG 解码（默认 false） */
+        fun enableSvg(enabled: Boolean) { svgEnabled = enabled }
 
         /** 设置全局占位图资源 ID */
         fun placeholder(res: Int) { placeholderRes = res }

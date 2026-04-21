@@ -5,12 +5,24 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.os.Build
 import coil.size.Size
 import coil.transform.Transformation
 import kotlin.math.min
 
+/**
+ * 灰度变换，将图片转换为灰度效果。
+ *
+ * ```kotlin
+ * imageView.loadImage(url) {
+ *     transform(GrayscaleTransformation())
+ * }
+ * ```
+ */
 class GrayscaleTransformation : Transformation {
     override val cacheKey = "aw_grayscale"
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
@@ -25,17 +37,15 @@ class GrayscaleTransformation : Transformation {
 }
 
 /**
- * 图片颜色滤镜转换。
+ * 颜色滤镜变换，在图片上叠加指定颜色。
  *
- * Coil [Transformation] 实现，使用 [PorterDuff.Mode.SRC_ATOP] 混合模式为图片叠加颜色。
+ * @param color 叠加的颜色值（ARGB）
  *
  * ```kotlin
  * imageView.loadImage(url) {
- *     transform(ColorFilterTransformation(Color.argb(128, 0, 0, 0)))
+ *     transform(ColorFilterTransformation(Color.parseColor("#80FF0000")))
  * }
  * ```
- *
- * @param color ARGB 颜色值
  */
 class ColorFilterTransformation(private val color: Int) : Transformation {
     override val cacheKey = "aw_color_filter_${Integer.toHexString(color)}"
@@ -50,26 +60,23 @@ class ColorFilterTransformation(private val color: Int) : Transformation {
 }
 
 /**
- * 图片边框转换。
+ * 边框变换，为图片添加边框。支持圆形和矩形两种模式。
  *
- * Coil [Transformation] 实现，为图片添加边框，支持圆形和矩形模式。
+ * 当 [circle] 为 `true` 时，会先将图片裁切为圆形，再绘制圆形边框。
+ *
+ * @param borderWidth 边框宽度（像素）
+ * @param borderColor 边框颜色
+ * @param circle      是否使用圆形模式（默认 false，矩形边框）
  *
  * ```kotlin
- * // 圆形带白色边框
+ * // 矩形边框
  * imageView.loadImage(url) {
- *     transform(BorderTransformation(4f, Color.WHITE, circle = true))
+ *     transform(BorderTransformation(2f, Color.WHITE))
  * }
  *
- * // 圆角矩形带黑色边框
- * imageView.loadImage(url) {
- *     transform(BorderTransformation(8f, Color.BLACK, circle = false))
- * }
+ * // 圆形边框（推荐使用 loadCircleWithBorder 快捷方法）
+ * imageView.loadCircleWithBorder(url, borderWidth = 4f, borderColor = Color.WHITE)
  * ```
- *
- * @param borderWidth 边框宽度（px），必须 > 0
- * @param borderColor 边框颜色
- * @param circle      true 为圆形边框，false 为矩形边框
- * @throws IllegalArgumentException 如果 [borderWidth] <= 0
  */
 class BorderTransformation(
     private val borderWidth: Float,
@@ -86,7 +93,6 @@ class BorderTransformation(
         val config = input.config ?: Bitmap.Config.ARGB_8888
         val output = Bitmap.createBitmap(input.width, input.height, config)
         val canvas = Canvas(output)
-        canvas.drawBitmap(input, 0f, 0f, null)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = borderColor
             style = Paint.Style.STROKE
@@ -96,11 +102,17 @@ class BorderTransformation(
             val cx = input.width / 2f
             val cy = input.height / 2f
             val maxRadius = minOf(input.width, input.height) / 2f
-            val radius = (maxRadius - borderWidth).coerceAtLeast(0f)
+            val radius = (maxRadius - borderWidth / 2f).coerceAtLeast(0f)
+            val clipPath = Path().apply {
+                addCircle(cx, cy, maxRadius, Path.Direction.CW)
+            }
+            canvas.clipPath(clipPath)
+            canvas.drawBitmap(input, 0f, 0f, null)
             if (radius > 0f) {
                 canvas.drawCircle(cx, cy, radius, paint)
             }
         } else {
+            canvas.drawBitmap(input, 0f, 0f, null)
             val half = borderWidth / 2f
             val right = (input.width - half).coerceAtLeast(half)
             val bottom = (input.height - half).coerceAtLeast(half)
@@ -111,19 +123,24 @@ class BorderTransformation(
 }
 
 /**
- * 图片高斯模糊转换。
+ * 高斯模糊变换。
  *
- * Coil [Transformation] 实现，支持 RenderEffect 硬件加速模糊和 StackBlur 软件模糊。
+ * 在 Android 12+ (API 31) 上使用 [RenderEffect] 硬件加速模糊，
+ * 低版本回退到 StackBlur 纯软件实现。
+ *
+ * @param radius   模糊半径（像素），范围 1~25（StackBlur 上限），RenderEffect 无此限制
+ * @param sampling 采样率（默认 1），大于 1 时先缩小再模糊再放大，可显著提升性能
  *
  * ```kotlin
- * imageView.loadImage(url) {
- *     transform(BlurTransformation(radius = 15, sampling = 4))
- * }
- * ```
+ * // 普通模糊
+ * imageView.loadBlur(url)
  *
- * @param radius   模糊半径（1~25），默认 15。值越大越模糊，但性能消耗也越大
- * @param sampling 采样因子（≥1），默认 4。值越大模糊效果越快，但质量会有所下降
- * @throws IllegalArgumentException 如果 [radius] 不在 1..25 范围内，或 [sampling] < 1
+ * // 自定义模糊半径
+ * imageView.loadBlur(url, radius = 20)
+ *
+ * // 高性能模糊（先缩小 2 倍再模糊）
+ * imageView.loadBlur(url, radius = 25, sampling = 2)
+ * ```
  */
 class BlurTransformation(
     private val radius: Int = 15,
@@ -164,44 +181,85 @@ class BlurTransformation(
     }
 }
 
+/**
+ * 裁切变换，从图片中裁切指定区域。
+ *
+ * @param x      裁切起始 X 坐标（像素）
+ * @param y      裁切起始 Y 坐标（像素）
+ * @param width  裁切宽度（像素），0 表示裁切到图片右边缘
+ * @param height 裁切高度（像素），0 表示裁切到图片下边缘
+ *
+ * ```kotlin
+ * imageView.loadImage(url) {
+ *     transform(CropTransformation(0, 0, 200, 200))
+ * }
+ * ```
+ */
+class CropTransformation(
+    private val x: Int = 0,
+    private val y: Int = 0,
+    private val width: Int = 0,
+    private val height: Int = 0
+) : Transformation {
+    override val cacheKey = "aw_crop_${x}_${y}_${width}_${height}"
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+        val cropX = x.coerceIn(0, input.width)
+        val cropY = y.coerceIn(0, input.height)
+        val cropW = if (width <= 0) input.width - cropX else minOf(width, input.width - cropX)
+        val cropH = if (height <= 0) input.height - cropY else minOf(height, input.height - cropY)
+        if (cropW <= 0 || cropH <= 0) return input
+        return Bitmap.createBitmap(input, cropX, cropY, cropW, cropH)
+    }
+}
+
+/**
+ * 水印变换，在图片上叠加水印图片。
+ *
+ * @param watermark 水印 Bitmap
+ * @param x         水印 X 坐标（像素），默认 0
+ * @param y         水印 Y 坐标（像素），默认 0
+ * @param alpha     水印透明度（0~255），默认 128
+ *
+ * ```kotlin
+ * val watermark = BitmapFactory.decodeResource(resources, R.drawable.watermark)
+ * imageView.loadImage(url) {
+ *     transform(WatermarkTransformation(watermark, alpha = 100))
+ * }
+ * ```
+ */
+class WatermarkTransformation(
+    private val watermark: Bitmap,
+    private val x: Int = 0,
+    private val y: Int = 0,
+    private val alpha: Int = 128
+) : Transformation {
+    override val cacheKey = "aw_watermark_${watermark.generationId}_${x}_${y}_${alpha}"
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+        val config = input.config ?: Bitmap.Config.ARGB_8888
+        val output = Bitmap.createBitmap(input.width, input.height, config)
+        val canvas = Canvas(output)
+        canvas.drawBitmap(input, 0f, 0f, null)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.alpha = alpha.coerceIn(0, 255)
+        }
+        canvas.drawBitmap(watermark, x.toFloat(), y.toFloat(), paint)
+        return output
+    }
+}
+
 internal object RenderEffectBlur {
 
-    private val createBlurEffect by lazy {
-        runCatching {
-            val renderEffectClass = Class.forName("android.graphics.RenderEffect")
-            val shaderClass = Class.forName("android.graphics.Shader")
-            val tileModeClass = Class.forName("android.graphics.Shader\$TileMode")
-            val clamp = tileModeClass.enumConstants?.firstOrNull {
-                (it as? Enum<*>)?.name == "CLAMP"
-            } ?: return@runCatching null
-            renderEffectClass.getMethod(
-                "createBlurEffect",
-                Float::class.javaPrimitiveType,
-                Float::class.javaPrimitiveType,
-                shaderClass,
-                tileModeClass
-            )
-        }.getOrNull()
-    }
-
-    private val setRenderEffect by lazy {
-        runCatching {
-            val renderEffectClass = Class.forName("android.graphics.RenderEffect")
-            Paint::class.java.getMethod("setRenderEffect", renderEffectClass)
-        }.getOrNull()
-    }
-
     fun apply(input: Bitmap, radius: Int): Bitmap? {
-        val createMethod = createBlurEffect ?: return null
-        val setMethod = setRenderEffect ?: return null
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
         return runCatching {
-            val blurEffect = createMethod.invoke(null, radius.toFloat(), radius.toFloat(), null, null)
-                ?: return null
+            val blurEffect = RenderEffect.createBlurEffect(
+                radius.toFloat(), radius.toFloat(), Shader.TileMode.CLAMP
+            )
             val config = input.config ?: Bitmap.Config.ARGB_8888
             val output = Bitmap.createBitmap(input.width, input.height, config)
             val canvas = Canvas(output)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-            setMethod.invoke(paint, blurEffect)
+            paint.setRenderEffect(blurEffect)
             canvas.drawBitmap(input, 0f, 0f, paint)
             output
         }.onFailure {
