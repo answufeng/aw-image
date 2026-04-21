@@ -24,6 +24,19 @@ class GrayscaleTransformation : Transformation {
     }
 }
 
+/**
+ * 图片颜色滤镜转换。
+ *
+ * Coil [Transformation] 实现，使用 [PorterDuff.Mode.SRC_ATOP] 混合模式为图片叠加颜色。
+ *
+ * ```kotlin
+ * imageView.loadImage(url) {
+ *     transform(ColorFilterTransformation(Color.argb(128, 0, 0, 0)))
+ * }
+ * ```
+ *
+ * @param color ARGB 颜色值
+ */
 class ColorFilterTransformation(private val color: Int) : Transformation {
     override val cacheKey = "aw_color_filter_${Integer.toHexString(color)}"
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
@@ -36,6 +49,28 @@ class ColorFilterTransformation(private val color: Int) : Transformation {
     }
 }
 
+/**
+ * 图片边框转换。
+ *
+ * Coil [Transformation] 实现，为图片添加边框，支持圆形和矩形模式。
+ *
+ * ```kotlin
+ * // 圆形带白色边框
+ * imageView.loadImage(url) {
+ *     transform(BorderTransformation(4f, Color.WHITE, circle = true))
+ * }
+ *
+ * // 圆角矩形带黑色边框
+ * imageView.loadImage(url) {
+ *     transform(BorderTransformation(8f, Color.BLACK, circle = false))
+ * }
+ * ```
+ *
+ * @param borderWidth 边框宽度（px），必须 > 0
+ * @param borderColor 边框颜色
+ * @param circle      true 为圆形边框，false 为矩形边框
+ * @throws IllegalArgumentException 如果 [borderWidth] <= 0
+ */
 class BorderTransformation(
     private val borderWidth: Float,
     private val borderColor: Int,
@@ -75,6 +110,21 @@ class BorderTransformation(
     }
 }
 
+/**
+ * 图片高斯模糊转换。
+ *
+ * Coil [Transformation] 实现，支持 RenderEffect 硬件加速模糊和 StackBlur 软件模糊。
+ *
+ * ```kotlin
+ * imageView.loadImage(url) {
+ *     transform(BlurTransformation(radius = 15, sampling = 4))
+ * }
+ * ```
+ *
+ * @param radius   模糊半径（1~25），默认 15。值越大越模糊，但性能消耗也越大
+ * @param sampling 采样因子（≥1），默认 4。值越大模糊效果越快，但质量会有所下降
+ * @throws IllegalArgumentException 如果 [radius] 不在 1..25 范围内，或 [sampling] < 1
+ */
 class BlurTransformation(
     private val radius: Int = 15,
     private val sampling: Int = 4
