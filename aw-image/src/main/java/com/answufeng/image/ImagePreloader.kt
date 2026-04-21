@@ -17,6 +17,9 @@ import kotlinx.coroutines.withContext
  * 支持单张/批量预加载和获取已缓存的 [Drawable]。
  * 批量预加载通过 [Semaphore] 控制并发数，避免瞬间发起大量请求。
  *
+ * 线程约束：所有 `suspend` 方法内部切换到 [kotlinx.coroutines.Dispatchers.IO]，
+ * 因此可在任意 dispatcher 调用。建议在 ViewModel 或 lifecycleScope 中调用。
+ *
  * ```kotlin
  * lifecycleScope.launch {
  *     // 单张预加载
@@ -26,7 +29,7 @@ import kotlinx.coroutines.withContext
  *     val results: List<Boolean> = ImagePreloader.preloadAll(context, urls, concurrency = 8)
  *
  *     // 获取已缓存的 Drawable
- *     val drawable: Drawable? = ImagePreloader.get(context, url)
+ *     val drawable: Drawable? = ImagePreloader.getDrawable(context, url)
  * }
  * ```
  */
@@ -35,10 +38,13 @@ object ImagePreloader {
     /**
      * 预加载单张图片到缓存。
      *
+     * 内部切换到 [kotlinx.coroutines.Dispatchers.IO] 执行。
+     *
      * @param context Context
      * @param data    图片数据源（URL / File / @DrawableRes 等）
      * @return `true` 表示加载成功并已缓存，`false` 表示失败
      */
+    @JvmSynthetic
     suspend fun preload(context: android.content.Context, data: Any): Boolean {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
@@ -68,6 +74,7 @@ object ImagePreloader {
      * @param data    图片数据源
      * @return 已缓存的 [Drawable]，未命中缓存或加载失败时返回 null
      */
+    @JvmSynthetic
     suspend fun getDrawable(context: android.content.Context, data: Any): Drawable? {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
@@ -100,6 +107,7 @@ object ImagePreloader {
      * @return 每个数据源的加载结果列表（`true` = 成功）
      * @throws IllegalArgumentException 如果 [concurrency] < 1
      */
+    @JvmSynthetic
     suspend fun preloadAll(
         context: android.content.Context,
         urls: List<Any>,

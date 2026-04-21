@@ -11,6 +11,14 @@ import android.net.NetworkCapabilities
  * 通过 [ConnectivityManager.NetworkCallback] 实时监听网络变化，
  * 缓存连接状态到 `@Volatile` 变量，[isConnected] 读取为 O(1) 操作。
  *
+ * 线程约束：
+ * - `ConnectivityManager.NetworkCallback` 的回调在主线程执行
+ * - `isConnected` 可在任意线程调用（仅读取 `@Volatile` 变量）
+ * - `ensureRegistered` 使用 double-checked locking 确保单次注册
+ *
+ * 生命周期：回调通过 `registerDefaultNetworkCallback` 注册，
+ * 随 ApplicationContext 生命周期存在，不会泄漏。
+ *
  * 首次调用 [isConnected] 时自动注册回调，后续调用直接读取缓存值。
  */
 internal object ImageNetworkMonitor {

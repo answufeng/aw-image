@@ -95,7 +95,9 @@ object AwImage {
     /**
      * 初始化全局 ImageLoader。
      *
-     * 建议在 [Application.onCreate] 中调用。多次调用会覆盖之前的配置。
+     * 建议在 [Application.onCreate] 中调用。多次调用会覆盖之前的配置，
+     * 包括已设置的 ImageLoader、占位图/错误图/兜底图、全局 crossfade 等。
+     * 如果只需要修改部分配置，仍需传入完整的配置块，未设置的项将恢复为默认值。
      *
      * @param context 任意 Context，内部会转为 ApplicationContext
      * @param config  可选的 DSL 配置块

@@ -1,4 +1,3 @@
-
 # aw-image ProGuard Rules
 # 此文件用于库自身的 release 构建混淆规则
 # Consumer-facing rules（供使用者混淆时使用）位于 consumer-rules.pro
@@ -15,6 +14,15 @@
 -keepattributes Signature
 -keepattributes Exceptions
 -keep class kotlin.Metadata { *; }
+-keep class kotlin.coroutines.jvm.internal.BaseContinuationImpl { *; }
+
+# ===========================================================
+# 保留协程相关类（预加载功能依赖）
+# ===========================================================
+
+-keepclassmembers class ** {
+    @kotlin.coroutines.jvm.internal.DebugMetadata *;
+}
 
 # ===========================================================
 # 保留枚举
@@ -47,3 +55,17 @@
     public static final android.os.Parcelable$Creator *;
 }
 
+# ===========================================================
+# 保留网络回调类（ImageNetworkMonitor 使用 ConnectivityManager.NetworkCallback）
+# ===========================================================
+
+-keepclassmembers class com.answufeng.image.ImageNetworkMonitor$ensureRegistered$1 {
+    *;
+}
+
+# ===========================================================
+# Coil 规则（Coil 自带 consumer rules，此处仅保留必要的库自身构建规则）
+# ===========================================================
+
+-dontwarn okio.**
+-dontwarn org.codehaus.mojo.**

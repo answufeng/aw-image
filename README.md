@@ -21,28 +21,6 @@
 - **日志调试**：可选日志输出，方便排查问题
 - **自定义磁盘缓存目录**：支持指定缓存路径
 
-## 架构
-
-```
-┌─────────────────────────────────────────┐
-│              用户代码                     │
-├─────────────────────────────────────────┤
-│  loadImage / loadCircle / loadRounded   │  ← 扩展函数 API 层
-│  loadBlur / loadCircleWithBorder        │
-├─────────────────────────────────────────┤
-│            AwImageScope                 │  ← DSL 配置层
-│  (直接操作 Coil ImageRequest.Builder)    │
-├─────────────────────────────────────────┤
-│  AwImage (全局配置)  ImagePreloader      │  ← 全局管理层
-│  ImageNetworkMonitor       AwImageLogger          │
-├─────────────────────────────────────────┤
-│  Grayscale / ColorFilter / Border /     │  ← 变换层
-│  Blur (StackBlur + RenderEffect)        │
-├─────────────────────────────────────────┤
-│              Coil + OkHttp              │  ← 底层引擎
-└─────────────────────────────────────────┘
-```
-
 ## 引入
 
 ```kotlin
@@ -63,20 +41,43 @@ dependencies {
 >
 > ProGuard 规则已内置于 AAR（consumer-rules.pro），无需额外配置。
 
-## 快速开始
+## 依赖说明
 
-### 零配置使用
+| 依赖 | 版本 | 用途 |
+|------|------|------|
+| Coil | 2.7.0 | 图片加载引擎 |
+| coil-gif | 2.7.0 | GIF 解码支持 |
+| coil-svg | 2.7.0 | SVG 解码支持（默认关闭） |
+| OkHttp | 4.12.0 | 网络层（可自定义） |
+| kotlinx-coroutines | 1.9.0 | 协程支持（预加载并发控制） |
+
+## 快速开始 (3 steps)
+
+### Step 1: 加载图片
+
+无需任何初始化，直接在 `ImageView` 上调用扩展函数：
 
 ```kotlin
 imageView.loadImage("https://example.com/photo.jpg")
-imageView.loadCircle(user.avatarUrl)
-imageView.loadRounded(url, radiusPx = 12f)
-imageView.loadRoundedDp(url, radiusDp = 8f)
-imageView.loadCircleWithBorder(url, borderWidth = 4f, borderColor = Color.WHITE)
-imageView.loadBlur(url)
 ```
 
-### 可选初始化
+### Step 2: 常用场景
+
+```kotlin
+// 圆形头像
+imageView.loadCircle(user.avatarUrl)
+
+// 圆角图片
+imageView.loadRounded(url, radiusDp = 8f)
+
+// 带边框的圆形头像
+imageView.loadCircleWithBorder(url, borderWidth = 4f, borderColor = Color.WHITE)
+
+// 模糊背景
+imageView.loadBlur(url, radius = 20)
+```
+
+### Step 3: 可选配置（Application 中初始化）
 
 ```kotlin
 class App : Application() {
@@ -85,8 +86,6 @@ class App : Application() {
         AwImage.init(this) {
             memoryCacheSize(0.25)
             diskCacheSize(256L * 1024 * 1024)
-            diskCacheDir(File(cacheDir, "my_image_cache"))
-            enableGif(true)
             placeholder(R.drawable.placeholder)
             error(R.drawable.error)
             crossfade(300)
@@ -96,28 +95,33 @@ class App : Application() {
 }
 ```
 
-### Drawable 占位图/错误图
+## 架构
 
-```kotlin
-AwImage.init(this) {
-    placeholder(ColorDrawable(Color.GRAY))
-    error(ColorDrawable(Color.RED))
-}
+```
+┌─────────────────────────────────────────┐
+│              用户代码                     │
+├─────────────────────────────────────────┤
+│  loadImage / loadCircle / loadRounded   │  ← 扩展函数 API 层
+│  loadBlur / loadCircleWithBorder        │
+├─────────────────────────────────────────┤
+│            AwImageScope                 │  ← DSL 配置层
+│  (直接操作 Coil ImageRequest.Builder)    │
+├─────────────────────────────────────────┤
+│  AwImage (全局配置)  ImagePreloader      │  ← 全局管理层
+│  ImageNetworkMonitor       AwImageLogger │
+├─────────────────────────────────────────┤
+│  Grayscale / ColorFilter / Border /     │  ← 变换层
+│  Blur (StackBlur + RenderEffect)        │
+├─────────────────────────────────────────┤
+│              Coil + OkHttp              │  ← 底层引擎
+└─────────────────────────────────────────┘
 ```
 
-### 自定义 OkHttpClient
+---
 
-```kotlin
-AwImage.init(this) {
-    okHttpClient(OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor { chain -> /* 统一添加 header */ }
-        .build()
-    )
-}
-```
+## 进阶使用
 
-## DSL 配置
+### DSL 配置
 
 `loadImage` 的配置块接收 `AwImageScope`，直接操作 Coil 的 `ImageRequest.Builder`，无中间对象分配。
 
@@ -170,7 +174,7 @@ imageView.loadImage(url) {
 }
 ```
 
-## 内置变换
+### 内置变换
 
 | 变换 | 说明 |
 |------|------|
@@ -178,6 +182,8 @@ imageView.loadImage(url) {
 | `ColorFilterTransformation(color)` | 颜色滤镜 |
 | `BorderTransformation(width, color, circle)` | 边框（支持圆形裁切） |
 | `BlurTransformation(radius, sampling)` | 高斯模糊（API 31+ 使用 RenderEffect 硬件加速，低版本回退 StackBlur） |
+| `CropTransformation(x, y, width, height)` | 图片裁切 |
+| `WatermarkTransformation(watermark, x, y, alpha)` | 水印叠加 |
 
 ### 变换示例
 
@@ -193,9 +199,14 @@ imageView.loadImage(url) {
 
 // 高斯模糊背景
 imageView.loadBlur(url, radius = 20, sampling = 2)
+
+// 图片裁切
+imageView.loadImage(url) {
+    transform(CropTransformation(0, 0, 200, 200))
+}
 ```
 
-## 预加载
+### 预加载
 
 ```kotlin
 lifecycleScope.launch {
@@ -207,13 +218,13 @@ lifecycleScope.launch {
     val successCount = results.count { it }
 
     // 获取已缓存的 Drawable
-    val drawable: Drawable? = ImagePreloader.get(context, url)
+    val drawable: Drawable? = ImagePreloader.getDrawable(context, url)
 }
 ```
 
 > `preloadAll` 默认并发数为 8，可通过 `concurrency` 参数调整。返回 `List<Boolean>` 表示每个 URL 的加载结果。
 
-## 缓存管理
+### 缓存管理
 
 ```kotlin
 // 清除缓存
@@ -230,7 +241,7 @@ val cached = AwImage.isCached(context, url)
 
 > 缓存清理方法内置异常保护，返回 `Boolean` 表示操作是否成功。
 
-## Lifecycle 感知
+### Lifecycle 感知
 
 绑定 LifecycleOwner 后，页面销毁时自动取消图片加载请求，避免回调泄漏。
 
@@ -246,7 +257,7 @@ holder.imageView.loadImage(url) {
 }
 ```
 
-## 批量取消
+### 批量取消
 
 通过标签批量取消图片加载请求：
 
@@ -258,7 +269,7 @@ imageView.loadImage(url) { tag("feed_list") }
 AwImage.cancelByTag("feed_list")
 ```
 
-## 离线智能缓存
+### 离线智能缓存
 
 默认开启：当设备无网络连接时，自动禁用网络请求，仅从内存/磁盘缓存读取图片。
 网络状态通过 `ConnectivityManager.NetworkCallback` 实时监听，恢复后自动切换回在线模式。
@@ -273,7 +284,7 @@ imageView.loadImage(url) {
 }
 ```
 
-## 全局配置项
+### 全局配置项
 
 | 配置 | 方法 | 默认值 |
 |------|------|--------|
@@ -283,13 +294,14 @@ imageView.loadImage(url) {
 | 磁盘缓存目录 | `diskCacheDir(file)` | `{cacheDir}/aw_image_cache` |
 | 渐入动画 | `crossfade(enabled)` / `crossfade(ms)` | true / 200ms |
 | GIF 支持 | `enableGif(enabled)` | true |
+| SVG 支持 | `enableSvg(enabled)` | false |
 | 全局占位图 | `placeholder(resId)` / `placeholder(Drawable)` | 0 (不设置) |
 | 全局错误图 | `error(resId)` / `error(Drawable)` | 0 (不设置) |
 | 全局兜底图 | `fallback(resId)` / `fallback(Drawable)` | 0 (不设置) |
 | 自定义网络层 | `okHttpClient(OkHttpClient)` | Coil 默认 |
 | 调试日志 | `enableLogging(enabled)` | false |
 
-## 从 Glide/Picasso 迁移
+### 从 Glide/Picasso 迁移
 
 | Glide | aw-image |
 |-------|----------|
@@ -302,14 +314,73 @@ imageView.loadImage(url) {
 | `.skipMemoryCache(true)` | DSL `disableCache()` |
 | `.listener(...)` | DSL `onSuccess { }` / `onError { }` |
 
-## 依赖说明
+---
 
-| 依赖 | 版本 | 用途 |
-|------|------|------|
-| Coil | 2.7.0 | 图片加载引擎 |
-| coil-gif | 2.7.0 | GIF 解码支持 |
-| OkHttp | 4.12.0 | 网络层（可自定义） |
-| kotlinx-coroutines | 1.9.0 | 协程支持（预加载并发控制） |
+## FAQ
+
+### Q: 如何取消单个图片加载请求？
+
+`loadImage` 返回 `Disposable` 对象，调用 `dispose()` 即可：
+
+```kotlin
+val disposable = imageView.loadImage(url)
+disposable.dispose()
+```
+
+但通常情况下不需要手动取消，Coil 会在 View detach 或发起新请求时自动取消。
+
+### Q: 如何自定义缓存策略？
+
+```kotlin
+imageView.loadImage(url) {
+    // 完全禁用缓存
+    disableCache()
+
+    // 仅使用内存缓存（跳过磁盘和网络）
+    memoryCacheOnly()
+
+    // 离线时仅使用缓存
+    offlineCacheEnabled(true)
+}
+```
+
+### Q: `loadImage` 传 null 会怎样？
+
+当 data 为 null 时，会依次尝试显示：
+1. DSL 中设置的 `fallback`
+2. 全局 fallback
+3. 全局 error
+4. 清空 ImageView
+
+不会触发网络请求。
+
+### Q: 如何自定义 OkHttpClient？
+
+```kotlin
+AwImage.init(this) {
+    okHttpClient(OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor { chain -> /* 统一添加 header */ }
+        .build()
+    )
+}
+```
+
+### Q: 多次调用 `AwImage.init()` 会怎样？
+
+会覆盖之前的所有配置。建议仅在 `Application.onCreate()` 中调用一次。
+
+### Q: 如何在 RecyclerView 中避免图片闪烁？
+
+```kotlin
+// 快速滑动时仅使用内存缓存
+holder.imageView.loadImage(url) {
+    memoryCacheOnly()
+    lifecycle(fragment)  // 页面销毁时自动取消
+}
+```
+
+---
 
 ## 许可证
 

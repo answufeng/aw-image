@@ -9,9 +9,17 @@ import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 图片加载进度拦截器
+ * 图片加载进度拦截器。
  *
- * 用于监听图片加载的进度，通过 OkHttp Interceptor 实现
+ * 通过 OkHttp Interceptor 监听网络图片的下载进度，
+ * 为注册了 URL 回调的请求实时推送 (currentBytes, totalBytes) 进度。
+ *
+ * 线程安全：内部使用 [ConcurrentHashMap] 存储回调映射，
+ * `register`/`unregister` 可在任意线程调用。
+ *
+ * 内存管理：请求完成或取消后必须调用 [unregister] 清理回调，
+ * 否则会导致 URL -> Listener 映射泄漏。`AwImageScope` 在
+ * onSuccess/onError 时自动清理。
  *
  * @see Interceptor
  */
