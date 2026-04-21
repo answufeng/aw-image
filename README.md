@@ -146,7 +146,7 @@ imageView.loadImage(url) {
     override(200, 200)
 
     // 缓存
-    noCache()
+    disableCache()
     offlineCacheEnabled(false)
     memoryCacheOnly()
 
@@ -299,7 +299,7 @@ imageView.loadImage(url) {
 | `.circleCrop()` | `imageView.loadCircle(url)` 或 DSL `circle()` |
 | `.transform(new RoundedCorners(16))` | `imageView.loadRounded(url, 16f)` 或 DSL `roundedCorners(16f)` |
 | `.diskCacheStrategy(DiskCacheStrategy.ALL)` | 默认行为 |
-| `.skipMemoryCache(true)` | DSL `noCache()` |
+| `.skipMemoryCache(true)` | DSL `disableCache()` |
 | `.listener(...)` | DSL `onSuccess { }` / `onError { }` |
 
 ## 依赖说明
