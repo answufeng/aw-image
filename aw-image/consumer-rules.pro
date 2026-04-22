@@ -15,6 +15,7 @@
     public *** getDiskCacheSize(...);
     public *** isCached(...);
     public *** cancelByTag(...);
+    public *** cancelAllTaggedRequests();
     public boolean isInitialized();
 }
 

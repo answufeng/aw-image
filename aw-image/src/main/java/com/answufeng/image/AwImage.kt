@@ -329,6 +329,20 @@ object AwImage {
         AwImageLogger.d("cancelByTag: cancelled ${disposables.size} requests for tag=$tag")
     }
 
+    /**
+     * 取消当前进程内通过 [registerTaggedDisposable] 登记过的**全部**标签请求。
+     *
+     * 适用于进程级清理或调试；常规场景优先在页面销毁时对具体 tag 调用 [cancelByTag]，
+     * 避免误杀其他模块仍需要的加载。
+     */
+    fun cancelAllTaggedRequests() {
+        val keys = taggedDisposables.keys.toList()
+        for (k in keys) {
+            cancelByTag(k)
+        }
+        AwImageLogger.d("cancelAllTaggedRequests: cleared ${keys.size} tag(s)")
+    }
+
     internal fun registerTaggedDisposable(tag: Any, disposable: Disposable) {
         val list = taggedDisposables.computeIfAbsent(tag) { CopyOnWriteArrayList() }
         list.add(disposable)
