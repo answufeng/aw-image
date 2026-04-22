@@ -59,6 +59,10 @@ git clone https://github.com/answufeng/aw-image.git
 ./gradlew :demo:installDebug
 ```
 
+## Pre-release checks (R8)
+
+Keep consumer rules aligned with Coil/OkHttp/Kotlin metadata. After tightening ProGuard, use `-printusage` on a host or sample app and regression-test list scrolling and cache behavior.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
