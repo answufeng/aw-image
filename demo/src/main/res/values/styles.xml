@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Base application theme. -->
-    <style name="Base.Theme.AwImagedemo" parent="Theme.Material3.DayNight">
+    <style name="Base.Theme.AwImagedemo" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_variant</item>
         <item name="colorSecondary">@color/secondary</item>
         <item name="colorSecondaryVariant">@color/secondary_variant</item>
         <item name="android:colorBackground">@color/background</item>
-        <item name="android:statusBarColor">@color/primary_variant</item>
+        <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/surface</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
@@ -78,9 +78,9 @@
 
     <!-- Toolbar 样式 -->
     <style name="Toolbar.AwImage" parent="Widget.Material3.Toolbar">
-        <item name="titleTextColor">@color/on_primary</item>
-        <item name="android:background">@color/primary</item>
-        <item name="elevation">8dp</item>
+        <item name="titleTextColor">@color/on_surface</item>
+        <item name="android:background">@color/surface</item>
+        <item name="elevation">0dp</item>
     </style>
 
     <!-- 图片容器样式 -->

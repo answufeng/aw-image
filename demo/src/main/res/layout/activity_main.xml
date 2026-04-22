@@ -8,7 +8,7 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/primary">
+        android:background="@color/background">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
@@ -16,7 +16,7 @@
             android:layout_height="?attr/actionBarSize"
             android:theme="@style/Toolbar.AwImage"
             app:title="图片库演示"
-            app:titleTextColor="@color/on_primary" />
+            app:titleTextColor="@color/on_surface" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -38,6 +38,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+
+                <!-- Hero -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwImage">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="AwImage Demo"
+                            style="@style/Text.AwImage.Title"
+                            android:textSize="22sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="一个更“可配置”的图片加载与处理演示：加载源、变换、缓存、预加载、GIF/SVG、错误兜底等。"
+                            style="@style/Text.AwImage.Body" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <!-- 图片加载卡片 -->
                 <com.google.android.material.card.MaterialCardView
@@ -308,6 +338,42 @@
 
                         </LinearLayout>
 
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 高级集成：tag、进度、isCached、SVG 等 -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    style="@style/Card.AwImage">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="高级集成"
+                            style="@style/Text.AwImage.Subtitle"
+                            android:layout_marginBottom="12dp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Tag、取消、进度、isCached、Lifecycle、SVG"
+                            style="@style/Text.AwImage.Body"
+                            android:layout_marginBottom="12dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnIntegrations"
+                            style="@style/MaterialButton.AwImage"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="打开「高级集成」页" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 

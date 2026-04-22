@@ -136,7 +136,10 @@ class TransformActivity : AppCompatActivity() {
     ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            topMargin = 12
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 12 }
 
             addView(ImageView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, 200).apply {

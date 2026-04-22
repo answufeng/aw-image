@@ -31,7 +31,7 @@ android {
     }
 
     lint {
-        abortOnError = false
+        abortOnError = true
         warningsAsErrors = false
     }
 }
@@ -52,6 +52,7 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.okhttp)
+    testImplementation(libs.mockwebserver)
 }
 
 apply(from = "${rootDir}/gradle/publish.gradle.kts")

@@ -1,11 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#FF1976D2</color>
-    <color name="colorPrimaryDark">#FF0D47A1</color>
-    <color name="colorAccent">#FF448AFF</color>
-    <color name="textPrimary">#FF212121</color>
-    <color name="textSecondary">#FF757575</color>
-    <color name="background">#FFF5F5F5</color>
+    <!-- Legacy aliases (keep for compatibility) -->
+    <color name="colorPrimary">#FF1E293B</color>
+    <color name="colorPrimaryDark">#FF0F172A</color>
+    <color name="colorAccent">#FF22C55E</color>
+    <color name="textPrimary">#FF0F172A</color>
+    <color name="textSecondary">#FF475569</color>
+    <color name="background">#FFF8FAFC</color>
     <color name="surface">#FFFFFFFF</color>
-    <color name="divider">#FFE0E0E0</color>
+    <color name="divider">#FFE2E8F0</color>
+    
+    <!-- Material Design colors -->
+    <color name="primary">#FF1E293B</color>
+    <color name="primary_variant">#FF0F172A</color>
+    <color name="secondary">#FF334155</color>
+    <color name="secondary_variant">#FF1E293B</color>
+    <color name="tertiary">#FF22C55E</color>
+    
+    <!-- Card colors -->
+    <color name="card_background">#FFFFFFFF</color>
+    <color name="card_border">#FFE2E8F0</color>
+    
+    <!-- Image colors -->
+    <color name="image_background">#FFF1F5F9</color>
+    
+    <!-- Material Design 3 on_* colors -->
+    <color name="on_primary">#FFFFFFFF</color>
+    <color name="on_surface">#FF0F172A</color>
+    <color name="on_surface_variant">#FF475569</color>
+    
+    <!-- Error color -->
+    <color name="error">#FFDC2626</color>
 </resources>

@@ -25,6 +25,8 @@
     public *** crossfade(...);
     public *** enableGif(...);
     public *** enableSvg(...);
+    public *** strictNetworkForOffline(...);
+    public boolean isStrictNetworkForOffline();
     public *** placeholder(...);
     public *** error(...);
     public *** fallback(...);
@@ -65,6 +67,15 @@
     public *** onSuccess(...);
     public *** onError(...);
     public *** onProgress(...);
+    public *** raw(...);
+    public *** addHeader(...);
+    public *** setHeader(...);
+    public *** removeHeader(...);
+    public *** headers(...);
+    public *** memoryCachePolicy(...);
+    public *** diskCachePolicy(...);
+    public *** networkCachePolicy(...);
+    public *** placeholderMemoryCacheKey(...);
 }
 
 # ===========================================================
@@ -115,7 +126,7 @@
 # 扩展函数（Kotlin 编译为静态方法）
 # ===========================================================
 
--keepclassmembers class com.answufeng.image.ImageExtKt {
+-keepclassmembers class com.answufeng.image.ImageLoadExtensionsKt {
     public static *** loadImage(...);
     public static *** loadCircle(...);
     public static *** loadRounded(...);

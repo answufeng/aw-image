@@ -9,6 +9,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.setPadding
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -38,12 +39,20 @@ class RecyclerViewActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
         }
 
+        val recyclerView = RecyclerView(this).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            layoutManager = LinearLayoutManager(this@RecyclerViewActivity)
+        }
+
         val btnToggle = Button(this).apply {
             text = "切换 Grid"
             setOnClickListener {
                 useGrid = !useGrid
                 text = if (useGrid) "切换 List" else "切换 Grid"
-                val recyclerView = layout.findViewById<RecyclerView>(R.id.recycler_view)
                 recyclerView.layoutManager = if (useGrid) {
                     GridLayoutManager(this@RecyclerViewActivity, 3)
                 } else {
@@ -59,15 +68,17 @@ class RecyclerViewActivity : AppCompatActivity() {
             }
         }
 
-        val btnPreload = Button(this).apply {
+        val btnPreload: Button = Button(this).apply {
             text = "预加载全部"
             setOnClickListener {
                 lifecycleScope.launch {
                     val results = com.answufeng.image.ImagePreloader.preloadAll(
-                        this@RecyclerViewActivity, urls, concurrency = 6
+                        context = this@RecyclerViewActivity,
+                        urls = this@RecyclerViewActivity.urls as List<Any>,
+                        concurrency = 6
                     )
                     val successCount = results.count { it }
-                    btnPreload.text = "预加载完成 ($successCount/${urls.size})"
+                    text = "预加载完成 ($successCount/${urls.size})"
                 }
             }
         }
@@ -85,14 +96,6 @@ class RecyclerViewActivity : AppCompatActivity() {
         }
         layout.addView(statusText)
 
-        val recyclerView = RecyclerView(this).apply {
-            id = R.id.recycler_view
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.MATCH_PARENT
-            )
-            layoutManager = LinearLayoutManager(this@RecyclerViewActivity)
-        }
         layout.addView(recyclerView)
 
         setContentView(layout)
@@ -102,9 +105,12 @@ class RecyclerViewActivity : AppCompatActivity() {
     inner class ImageAdapter(private val urls: List<String>) :
         RecyclerView.Adapter<ImageAdapter.ViewHolder>() {
 
+        private val ivItemId = View.generateViewId()
+        private val tvIndexId = View.generateViewId()
+
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val imageView: ImageView = view.findViewById(R.id.iv_item)
-            val tvIndex: TextView = view.findViewById(R.id.tv_index)
+            val imageView: ImageView = view.findViewById(ivItemId)
+            val tvIndex: TextView = view.findViewById(tvIndexId)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -112,12 +118,12 @@ class RecyclerViewActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(8, 8, 8, 8)
                 addView(TextView(parent.context).apply {
-                    id = R.id.tv_index
+                    id = tvIndexId
                     textSize = 14f
                     setPadding(0, 0, 12, 0)
                 })
                 addView(ImageView(parent.context).apply {
-                    id = R.id.iv_item
+                    id = ivItemId
                     layoutParams = LinearLayout.LayoutParams(200, 200)
                     scaleType = ImageView.ScaleType.CENTER_CROP
                     setBackgroundColor(Color.parseColor("#FFE0E0E0"))

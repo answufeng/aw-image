@@ -32,6 +32,9 @@ import kotlinx.coroutines.withContext
  *     val drawable: Drawable? = ImagePreloader.getDrawable(context, url)
  * }
  * ```
+ *
+ * 各方法可选的 `requestConfig` 与 [com.answufeng.image.loadImage] 中通过 DSL 对 `ImageRequest.Builder`
+ * 所做的配置**语义一致**（`size`、请求头、变换等），以保证与列表展示命中同一缓存。
  */
 object ImagePreloader {
 
@@ -42,16 +45,23 @@ object ImagePreloader {
      *
      * @param context Context
      * @param data    图片数据源（URL / File / @DrawableRes 等）
+     * @param requestConfig 可选，对 [ImageRequest.Builder] 的配置（[ImageRequest.Builder.size]、
+     *  [ImageRequest.Builder.transformations] 等），应与 [com.answufeng.image.loadImage] 中实际加载
+     *  时一致，避免缓存键与展示请求不一致导致重复加载。
      * @return `true` 表示加载成功并已缓存，`false` 表示失败
      */
     @JvmSynthetic
-    suspend fun preload(context: android.content.Context, data: Any): Boolean {
+    suspend fun preload(
+        context: android.content.Context,
+        data: Any,
+        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
+    ): Boolean {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
-                val request = ImageRequest.Builder(appContext)
-                    .data(data)
-                    .build()
+                val builder = ImageRequest.Builder(appContext).data(data)
+                requestConfig?.invoke(builder)
+                val request = builder.build()
                 val result = Coil.imageLoader(appContext).execute(request)
                 val success = result is SuccessResult
                 AwImageLogger.d("preload: data=$data, success=$success")
@@ -68,21 +78,27 @@ object ImagePreloader {
      * 与 [preload] 不同，此方法返回 [Drawable] 对象，可直接设置到 ImageView。
      * 如果未命中缓存，会触发加载；加载失败返回 null。
      *
-     * 内部禁用硬件 Bitmap（`allowHardware(false)`），确保返回的 Drawable 可直接使用。
+     * 内部默认 `allowHardware(false)`，[requestConfig] 中可再覆盖以与业务一致。
      *
      * @param context Context
      * @param data    图片数据源
+     * @param requestConfig 可选，[ImageRequest.Builder] 的额外配置（在 `data` 与 `allowHardware` 之后应用）。
      * @return 已缓存的 [Drawable]，未命中缓存或加载失败时返回 null
      */
     @JvmSynthetic
-    suspend fun getDrawable(context: android.content.Context, data: Any): Drawable? {
+    suspend fun getDrawable(
+        context: android.content.Context,
+        data: Any,
+        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
+    ): Drawable? {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
-                val request = ImageRequest.Builder(appContext)
+                val builder = ImageRequest.Builder(appContext)
                     .data(data)
                     .allowHardware(false)
-                    .build()
+                requestConfig?.invoke(builder)
+                val request = builder.build()
                 val result = Coil.imageLoader(appContext).execute(request)
                 (result as? SuccessResult)?.drawable
             }.onFailure {
@@ -104,6 +120,7 @@ object ImagePreloader {
      * @param context     Context
      * @param urls        图片数据源列表
      * @param concurrency 最大并发数，默认 8
+     * @param requestConfig 可选，会应用到**每一张** [preload] 请求（如统一 [ImageRequest.Builder.size]）。
      * @return 每个数据源的加载结果列表（`true` = 成功）
      * @throws IllegalArgumentException 如果 [concurrency] < 1
      */
@@ -111,7 +128,8 @@ object ImagePreloader {
     suspend fun preloadAll(
         context: android.content.Context,
         urls: List<Any>,
-        concurrency: Int = 8
+        concurrency: Int = 8,
+        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
     ): List<Boolean> {
         require(concurrency >= 1) { "concurrency must be >= 1, got $concurrency" }
         val appContext = context.applicationContext
@@ -122,7 +140,7 @@ object ImagePreloader {
                 async {
                     semaphore.acquire()
                     try {
-                        preload(appContext, url)
+                        preload(appContext, url, requestConfig)
                     } finally {
                         semaphore.release()
                     }

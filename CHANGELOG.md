@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Progress / 并发**: `onProgress` 改为按请求唯一 token 关联，同一 URL 多请求不再共用进度回调；内部头 `X-AwImage-Progress-Token` 在发往服务端前剥离
+- **Blur (API 31+)**: `RenderEffectBlur` 在主线程执行，与系统对 `RenderEffect` 的线程要求一致
+- **AwImage.init**: `init` 整体同步化，避免并行初始化导致全局状态与 `ImageLoader` 不一致
+- **clearMemoryCache / clearDiskCache**: 当 `memoryCache` / `diskCache` 为 null 时返回 `false`，不再误报成功
+- **全局 crossfade**: `ImageConfig.crossfade(durationMs)` 在 `durationMs == 0` 时关闭渐入，与 `AwImageScope` 行为一致
+- **圆角**: `roundedCorners` 负数半径按 0 处理，避免传入 Coil 变换产生异常结果
+- **GIF + SVG**: `init` 合并为单次 `components { }`，避免 Coil 升级时解码器注册被覆盖的风险
 - **Memory leak**: `taggedDisposables` 中 Disposable 在请求完成后自动清理，不再持续累积
 - **Crossfade duration**: 全局 `crossfadeDuration` 配置现在正确传递给 Coil（之前只传了 `crossfade(true)` 未传时长）
 - **BorderTransformation**: `circle=true` 时现在先裁切为圆形再绘制边框，不再露出方形图片
@@ -24,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Refactor**: `loadImage` 中 `data==null` 的 fallback 逻辑提取为 `resolveFallback` 方法，消除重复代码
 
 ### Added
+
+- `strictNetworkForOffline(Boolean)` / `isStrictNetworkForOffline` — 控制离线仅缓存策略是否要求 `VALIDATED` 网络（默认 `true`；设为 `false` 时仅要求 `INTERNET`，减轻强制门户等场景误判）
 
 - `onStart` / `onSuccess` / `onError` — `AwImageScope` 独立回调方法，无需通过 `listener()` 设置
 - `onProgress` — `AwImageScope` 下载进度回调，通过 OkHttp 拦截器实现

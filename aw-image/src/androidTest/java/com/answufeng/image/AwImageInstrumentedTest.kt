@@ -5,7 +5,9 @@ import android.graphics.drawable.ColorDrawable
 import android.widget.ImageView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assert.*
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,5 +120,15 @@ class AwImageInstrumentedTest {
         AwImage.init(context)
         val loader = AwImage.imageLoader(context)
         assertNotNull(loader)
+    }
+
+    @Test
+    fun isCached_doesNotCrash_forUnreachableUrl() {
+        AwImage.init(context)
+        val cached = AwImage.isCached(
+            context,
+            "https://127.0.0.1:9/aw_image_iscache_instrumented.png"
+        )
+        assertFalse(cached)
     }
 }

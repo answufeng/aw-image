@@ -7,6 +7,8 @@ import coil.size.Scale
 import coil.transform.CircleCropTransformation
 import coil.transform.RoundedCornersTransformation
 import coil.transform.Transformation
+import okhttp3.Headers
+import java.util.UUID
 
 /**
  * [loadImage] 的 DSL 作用域，直接操作 Coil 的 [ImageRequest.Builder]。
@@ -14,8 +16,13 @@ import coil.transform.Transformation
  * 相比旧版 `ImageLoadConfig`，`AwImageScope` 不创建中间配置对象，
  * 而是将 DSL 配置直接映射到 Coil Builder，减少对象分配。
  *
- * 线程约束：此类的实例应在主线程创建和使用。涉及的 Coil Builder
- * 操作最终会在 `applyTo` 中统一提交。
+ * ## 线程
+ * 应在 **主线程** 上调用 [loadImage][com.answufeng.image.loadImage] 及其 DSL
+ *（与 `ImageView`、Coil 常规用法一致）。预加载、磁盘缓存等后台工作由 Coil 调度，无需在此处理。
+ *
+ * ## 与 Coil 的边界
+ * 需要本库未封装的参数时，使用 [addHeader] / [setHeader]、[memoryCachePolicy]、[networkCachePolicy] 等，
+ * 或使用 [raw] 直接配置 [ImageRequest.Builder]。
  *
  * ```kotlin
  * imageView.loadImage(url) {
@@ -35,7 +42,13 @@ import coil.transform.Transformation
  * ```
  */
 @AwImageDsl
-class AwImageScope internal constructor(private val builder: ImageRequest.Builder) {
+class AwImageScope internal constructor(
+    private val builder: ImageRequest.Builder,
+    /**
+     * 与本次请求的 [ImageRequest.data] 一致（Coil 新版 [ImageRequest.Builder] 的 `data` 字段不可读）。
+     */
+    internal val requestData: Any? = null,
+) {
 
     private val transforms = mutableListOf<Transformation>()
     private var circleEnabled = false
@@ -44,6 +57,10 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     private var cacheDisabled = false
     private var memoryCacheOnlyEnabled = false
     private var crossfadeExplicitlySet = false
+
+    /** [raw] 块在 [applyTo] 尾部依次执行，用于补全任意 Builder 配置。 */
+    private val rawBlocks = mutableListOf<ImageRequest.Builder.() -> Unit>()
+
     internal var tagValue: Any? = null
         private set
     internal var lifecycleOwner: androidx.lifecycle.LifecycleOwner? = null
@@ -58,6 +75,13 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     private var onSuccessCallback: ((coil.request.SuccessResult) -> Unit)? = null
     private var onErrorCallback: ((coil.request.ErrorResult) -> Unit)? = null
     internal var onProgressCallback: ((Long, Long) -> Unit)? = null
+        private set
+
+    /**
+     * 与 [onProgress] 配套的唯一 token，写入 OkHttp 请求头并在 [ProgressInterceptor] 中剥离。
+     * 用于区分同一 URL 的并发下载进度。
+     */
+    internal var progressToken: String? = null
         private set
 
     /** 设置占位图资源 ID */
@@ -120,7 +144,7 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
      * @param radius 圆角半径，必须 >= 0
      */
     fun roundedCorners(radius: Float) {
-        roundedRadius = floatArrayOf(radius)
+        roundedRadius = floatArrayOf(radius.coerceAtLeast(0f))
     }
 
     /**
@@ -132,7 +156,12 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
      * @param bottomLeft 左下角半径
      */
     fun roundedCorners(topLeft: Float, topRight: Float, bottomRight: Float, bottomLeft: Float) {
-        roundedRadius = floatArrayOf(topLeft, topRight, bottomRight, bottomLeft)
+        roundedRadius = floatArrayOf(
+            topLeft.coerceAtLeast(0f),
+            topRight.coerceAtLeast(0f),
+            bottomRight.coerceAtLeast(0f),
+            bottomLeft.coerceAtLeast(0f),
+        )
     }
 
     /**
@@ -189,6 +218,79 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
     }
 
     /**
+     * 细粒度控制**内存**缓存读写（与 [disableCache]、[memoryCacheOnly] 二选一更稳妥，不要混用矛盾策略）。
+     *
+     * 映射 [ImageRequest.Builder.memoryCachePolicy]。
+     */
+    fun memoryCachePolicy(policy: CachePolicy) {
+        builder.memoryCachePolicy(policy)
+    }
+
+    /**
+     * 细粒度控制**磁盘**缓存读写。
+     */
+    fun diskCachePolicy(policy: CachePolicy) {
+        builder.diskCachePolicy(policy)
+    }
+
+    /**
+     * 细粒度控制**网络**使用（如仅禁用网络、仍写磁盘，视 Coil 行为而定）。
+     */
+    fun networkCachePolicy(policy: CachePolicy) {
+        builder.networkCachePolicy(policy)
+    }
+
+    /**
+     * 为本次网络请求增加 HTTP 头（CDN 鉴权、User-Agent 等）。映射 [ImageRequest.Builder.addHeader]。
+     */
+    fun addHeader(name: String, value: String) {
+        builder.addHeader(name, value)
+    }
+
+    /**
+     * 设置/覆盖单条请求头。映射 [ImageRequest.Builder.setHeader]。
+     */
+    fun setHeader(name: String, value: String) {
+        builder.setHeader(name, value)
+    }
+
+    /**
+     * 移除指定名称的请求头。映射 [ImageRequest.Builder.removeHeader]。
+     */
+    fun removeHeader(name: String) {
+        builder.removeHeader(name)
+    }
+
+    /**
+     * 以 [Headers] 整体替换本请求将使用的头集合。映射 [ImageRequest.Builder.headers]。
+     */
+    fun headers(headers: Headers) {
+        builder.headers(headers)
+    }
+
+    /**
+     * 多阶段/占位图优化：用内存中已有位图的缓存键作为「占位图」源（如先显示缩略、再全图）。
+     * 映射 [ImageRequest.Builder.placeholderMemoryCacheKey]（字符串形式）。
+     */
+    fun placeholderMemoryCacheKey(key: String?) {
+        builder.placeholderMemoryCacheKey(key)
+    }
+
+    /**
+     * 高级：在 [applyTo] **即将**包装监听器前，对 [ImageRequest.Builder] 做最后一轮配置。
+     *
+     * 多次调用会**按顺序**全部执行。适合 [ImageRequest] 中本库未单独封装的项。
+     *
+     * **重要**：[circle]、[transform] 等由 [applyTo] 在 `raw` **之前**调用
+     * [ImageRequest.Builder.transformations]，因此 **不要** 在 `raw` 中再设 `transformations`，
+     * 否则会被库侧变换覆盖；请求头、单独 `size`、额外 `tag` 等可安全放在 `raw` 中。
+     * **不要** 移除或覆盖 [ProgressInterceptor.PROGRESS_TOKEN_HEADER]（[onProgress] 依赖）。
+     */
+    fun raw(block: ImageRequest.Builder.() -> Unit) {
+        rawBlocks.add(block)
+    }
+
+    /**
      * 添加自定义 [Transformation]（累积模式，多次调用不会覆盖）。
      *
      * ```kotlin
@@ -208,7 +310,7 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
      */
     fun crossfade(enabled: Boolean = true) {
         crossfadeExplicitlySet = true
-        if (enabled) builder.crossfade(true)
+        builder.crossfade(enabled)
     }
 
     /**
@@ -218,7 +320,11 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
      */
     fun crossfade(durationMs: Int) {
         crossfadeExplicitlySet = true
-        if (durationMs > 0) builder.crossfade(durationMs)
+        if (durationMs > 0) {
+            builder.crossfade(durationMs)
+        } else {
+            builder.crossfade(false)
+        }
     }
 
     /**
@@ -316,27 +422,40 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
             builder.networkCachePolicy(CachePolicy.DISABLED)
         }
 
+        for (block in rawBlocks) {
+            block(builder)
+        }
+
         val hasStart = onStartCallback != null
         val hasSuccess = onSuccessCallback != null
         val hasError = onErrorCallback != null
         val hasProgress = onProgressCallback != null
         if (hasStart || hasSuccess || hasError || hasProgress) {
+            val tokenSnapshot = progressToken
+            val progressCb = onProgressCallback
             builder.listener(
                 onStart = {
                     AwImageLogger.d("loadImage: onStart")
                     onStartCallback?.invoke()
                 },
-                onSuccess = { _, result ->
-                    AwImageLogger.d("loadImage: onSuccess")
-                    val url = result.request.data?.toString()
-                    if (url != null) ProgressInterceptor.unregister(url)
-                    onSuccessCallback?.invoke(result)
+                onCancel = { _ ->
+                    if (tokenSnapshot != null && progressCb != null) {
+                        ProgressInterceptor.unregister(tokenSnapshot, progressCb)
+                    }
                 },
                 onError = { _, result ->
                     AwImageLogger.e("loadImage: onError - ${result.throwable.message}")
-                    val url = result.request.data?.toString()
-                    if (url != null) ProgressInterceptor.unregister(url)
+                    if (tokenSnapshot != null && progressCb != null) {
+                        ProgressInterceptor.unregister(tokenSnapshot, progressCb)
+                    }
                     onErrorCallback?.invoke(result)
+                },
+                onSuccess = { _, result ->
+                    AwImageLogger.d("loadImage: onSuccess")
+                    if (tokenSnapshot != null && progressCb != null) {
+                        ProgressInterceptor.unregister(tokenSnapshot, progressCb)
+                    }
+                    onSuccessCallback?.invoke(result)
                 },
             )
         }
@@ -344,10 +463,12 @@ class AwImageScope internal constructor(private val builder: ImageRequest.Builde
 
     internal fun registerProgressIfNeeded() {
         val callback = onProgressCallback ?: return
-        val data = builder.data ?: return
-        if (data is String) {
-            ProgressInterceptor.register(data, callback)
-        }
+        val data = requestData ?: return
+        if (data !is String) return
+        val token = UUID.randomUUID().toString()
+        progressToken = token
+        ProgressInterceptor.register(token, callback)
+        builder.addHeader(ProgressInterceptor.PROGRESS_TOKEN_HEADER, token)
     }
 
     internal val isCrossfadeExplicitlySet: Boolean get() = crossfadeExplicitlySet

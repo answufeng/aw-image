@@ -23,11 +23,27 @@ import android.net.NetworkCapabilities
  */
 internal object ImageNetworkMonitor {
 
+    /**
+     * 为 true（默认）时，[isConnected] 要求 [NetworkCapabilities.NET_CAPABILITY_VALIDATED]；
+     * 为 false 时仅要求 [NetworkCapabilities.NET_CAPABILITY_INTERNET]。
+     */
+    @Volatile
+    internal var isStrictNetworkForOffline: Boolean = true
+
     @Volatile
     private var connected: Boolean = false
 
     @Volatile
     private var registered = false
+
+    private fun hasUsableInternet(caps: NetworkCapabilities): Boolean {
+        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        return if (isStrictNetworkForOffline) {
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        } else {
+            true
+        }
+    }
 
     /**
      * 检查当前是否联网。
@@ -50,7 +66,8 @@ internal object ImageNetworkMonitor {
             connected = queryCurrentState(cm)
             cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    connected = true
+                    val caps = cm.getNetworkCapabilities(network)
+                    connected = caps != null && hasUsableInternet(caps)
                 }
 
                 override fun onLost(network: Network) {
@@ -60,8 +77,7 @@ internal object ImageNetworkMonitor {
                 override fun onCapabilitiesChanged(
                     network: Network, caps: NetworkCapabilities
                 ) {
-                    connected = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    connected = hasUsableInternet(caps)
                 }
             })
             registered = true
@@ -71,7 +87,6 @@ internal object ImageNetworkMonitor {
     private fun queryCurrentState(cm: ConnectivityManager): Boolean {
         val network = cm.activeNetwork ?: return false
         val caps = cm.getNetworkCapabilities(network) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return hasUsableInternet(caps)
     }
 }

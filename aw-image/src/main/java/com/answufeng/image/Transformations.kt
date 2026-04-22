@@ -12,6 +12,8 @@ import android.graphics.Shader
 import android.os.Build
 import coil.size.Size
 import coil.transform.Transformation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.min
 
 /**
@@ -158,7 +160,9 @@ class BlurTransformation(
         if (input.width <= 0 || input.height <= 0) return input
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val result = RenderEffectBlur.apply(input, radius)
+            val result = withContext(Dispatchers.Main) {
+                RenderEffectBlur.apply(input, radius)
+            }
             if (result != null) return result
         }
 
@@ -254,7 +258,7 @@ class WatermarkTransformation(
  * 相比纯软件实现性能提升约 30%。失败时返回 null，调用方应回退
  * 到 [StackBlur] 软件实现。
  *
- * 线程约束：必须在主线程调用（Canvas 操作依赖 UI 线程）。
+ * 线程约束：须在主线程执行（由 [BlurTransformation] 通过 [withContext] 调度）。
  */
 internal object RenderEffectBlur {
 
@@ -268,7 +272,10 @@ internal object RenderEffectBlur {
             val output = Bitmap.createBitmap(input.width, input.height, config)
             val canvas = Canvas(output)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-            paint.setRenderEffect(blurEffect)
+            // API 31+；部分编译环境对 Paint.setRenderEffect 解析不稳定，反射保证可编译
+            Paint::class.java
+                .getMethod("setRenderEffect", RenderEffect::class.java)
+                .invoke(paint, blurEffect)
             canvas.drawBitmap(input, 0f, 0f, paint)
             output
         }.onFailure {

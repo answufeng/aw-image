@@ -8,8 +8,8 @@
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="🖼️ 图片库演示"
-        android:theme="@style/Theme.Material3.DayNight">
+        android:label="AwImage Demo"
+        android:theme="@style/Theme.AwImagedemo">
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -44,6 +44,9 @@
             android:exported="false" />
         <activity
             android:name=".FilterActivity"
+            android:exported="false" />
+        <activity
+            android:name=".IntegrationsActivity"
             android:exported="false" />
     </application>
 </manifest>

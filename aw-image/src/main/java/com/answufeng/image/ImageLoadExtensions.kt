@@ -41,16 +41,25 @@ private fun ImageRequest.Builder.applyGlobalCrossfade() {
  * @param owner LifecycleOwner 实例
  * @param data 图片数据源（用于清理进度回调）
  */
-private fun bindLifecycle(disposable: Disposable, owner: LifecycleOwner, data: Any? = null) {
+private fun bindLifecycle(
+    disposable: Disposable,
+    owner: LifecycleOwner,
+    progressToken: String? = null,
+    onProgress: ((Long, Long) -> Unit)? = null,
+) {
     if (owner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
         if (!disposable.isDisposed) disposable.dispose()
-        if (data is String) ProgressInterceptor.unregister(data)
+        if (progressToken != null && onProgress != null) {
+            ProgressInterceptor.unregister(progressToken, onProgress)
+        }
         return
     }
     val observer = LifecycleEventObserver { _, event ->
         if (event == Lifecycle.Event.ON_DESTROY) {
             if (!disposable.isDisposed) disposable.dispose()
-            if (data is String) ProgressInterceptor.unregister(data)
+            if (progressToken != null && onProgress != null) {
+                ProgressInterceptor.unregister(progressToken, onProgress)
+            }
         }
     }
     owner.lifecycle.addObserver(observer)
@@ -104,11 +113,13 @@ private fun resolveFallback(imageView: ImageView, scope: AwImageScope?) {
  * }
  * ```
  *
- * @param data           图片数据源，为 null 时显示 fallback 或全局错误图
+ * @param data           图片数据源；**为 null** 时不发起 Coil 请求，仅走 [resolveFallback]：
+ *                       DSL `fallback` → 全局 fallback → 全局 error → 清空 ImageView。
+ *                       此时 DSL 中除 `fallback` 外的大部分请求项（尺寸、变换、网络）无实际作用。
  * @param placeholderRes 占位图资源 ID（0 表示不设置，使用全局配置）
  * @param errorRes       错误图资源 ID（0 表示不设置，使用全局配置）
  * @param config         可选的 [AwImageScope] DSL 配置块
- * @return [Disposable]，始终非 null
+ * @return [Disposable]，始终非 null（data 为 null 时为惰性已释放的占位对象）
  */
 fun ImageView.loadImage(
     data: Any?,
@@ -131,6 +142,8 @@ fun ImageView.loadImage(
 
     var tagValue: Any? = null
     var lifecycleOwner: LifecycleOwner? = null
+    var onProgress: ((Long, Long) -> Unit)? = null
+    var progressToken: String? = null
 
     val disposable = load(data) {
         val phDrawable = AwImage.globalPlaceholderDrawable
@@ -150,22 +163,24 @@ fun ImageView.loadImage(
         }
 
         if (config != null) {
-            val scope = AwImageScope(this)
+            val scope = AwImageScope(this, data)
             scope.config()
             if (!scope.isCrossfadeExplicitlySet) {
                 applyGlobalCrossfade()
             }
-            scope.applyTo(context)
             scope.registerProgressIfNeeded()
+            scope.applyTo(context)
             tagValue = scope.tagValue
             lifecycleOwner = scope.lifecycleOwner
+            onProgress = scope.onProgressCallback
+            progressToken = scope.progressToken
         } else {
             applyGlobalCrossfade()
         }
     }
 
     lifecycleOwner?.let { owner ->
-        bindLifecycle(disposable, owner, data)
+        bindLifecycle(disposable, owner, progressToken, onProgress)
     }
 
     if (tagValue != null) {

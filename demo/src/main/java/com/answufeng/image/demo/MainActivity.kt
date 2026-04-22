@@ -2,7 +2,9 @@ package com.answufeng.image.demo
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 
 class MainActivity : AppCompatActivity() {
@@ -10,6 +12,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
 
         findViewById<MaterialButton>(R.id.btnLoadNetwork).setOnClickListener {
             startActivity(Intent(this, BasicLoadActivity::class.java))
@@ -80,6 +85,30 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, CacheActivity::class.java).apply {
                 putExtra("focus", "clear")
             })
+        }
+        findViewById<MaterialButton>(R.id.btnIntegrations).setOnClickListener {
+            startActivity(Intent(this, IntegrationsActivity::class.java))
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_theme -> {
+                val current = AppCompatDelegate.getDefaultNightMode()
+                val next = if (current == AppCompatDelegate.MODE_NIGHT_YES) {
+                    AppCompatDelegate.MODE_NIGHT_NO
+                } else {
+                    AppCompatDelegate.MODE_NIGHT_YES
+                }
+                AppCompatDelegate.setDefaultNightMode(next)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 }

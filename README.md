@@ -2,13 +2,15 @@
 
 [![](https://jitpack.io/v/answufeng/aw-image.svg)](https://jitpack.io/#answufeng/aw-image)
 
-基于 Coil 封装的 Android 图片加载库，提供简洁的 DSL API、常用变换和预加载支持。
+基于 Coil 封装的 Android 图片加载库，提供简洁的 DSL API、常用变换和预加载支持。  
+设计目标：在**不隐藏 Coil 能力**的前提下，用 Kotlin DSL 减少样板代码，并统一缓存键、进度与混淆规则（详见下文「高级 API」与「ProGuard」）。
 
 ## 特性
 
 - **零配置**：无需初始化即可使用
 - **DSL API**：`loadImage` / `loadCircle` / `loadRounded` / `loadRoundedDp` / `loadCircleWithBorder` / `loadBlur`
 - **轻量 Scope**：`AwImageScope` 直接操作 Coil Builder，零中间对象分配
+- **高级/逃生口**：`raw { }` 与 `addHeader` / 细粒度 `CachePolicy` / `placeholderMemoryCacheKey`（多阶段图）
 - **预加载**：单张/批量预加载（返回结果），获取 Drawable，并发可控
 - **内置变换**：灰度 / 颜色滤镜 / 边框 / 高斯模糊（API 31+ RenderEffect 硬件加速）
 - **缓存管理**：内存/磁盘缓存清理，缓存查询，异常安全
@@ -33,13 +35,13 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.answufeng:aw-image:1.0.0")
+    implementation("com.github.answufeng:aw-image:1.2.0")
 }
 ```
 
-> Coil 和 OkHttp 以 `api` 方式传递，无需额外声明。
+> Coil 和 OkHttp 以 `api` 方式传递，宿主**无需**再写 `implementation(coil)` 即可编译使用 Coil/OkHttp 类型；若你自己也依赖了不同版本的 Coil/OkHttp，见下文「与宿主应用的依赖关系」。
 >
-> ProGuard 规则已内置于 AAR（consumer-rules.pro），无需额外配置。
+> 规则文件：`aw-image` 通过 `consumerProguardFiles` 内置 [consumer-rules.pro](aw-image/consumer-rules.pro)，R8/ProGuard 下扩展函数等入口已做保留。Debug 不混淆，**请在 Release 上验证**（本仓库 CI 中示范 `:demo:assembleRelease`）。
 
 ## 依赖说明
 
@@ -50,6 +52,21 @@ dependencies {
 | coil-svg | 2.7.0 | SVG 解码支持（默认关闭） |
 | OkHttp | 4.12.0 | 网络层（可自定义） |
 | kotlinx-coroutines | 1.9.0 | 协程支持（预加载并发控制） |
+
+### 与宿主应用的依赖关系（`api` 传递）
+
+- 本库对 Coil、`coil-gif`、`okhttp3` 使用 **`api`**，与 App 的 **classpath 中只会解析一份** 传递依赖；Gradle 会按 **最近版本/约束** 选一套版本。
+- **建议**：宿主**不要**再单独指定与上述表格大版本冲突的 Coil/OkHttp，或在 `gradle/libs.versions.toml` 中**统一** `coil`、`okio`、`okhttp` 版本，避免 `Duplicate class` 或行为不一致。
+- 若你**完全不用**本库在 DSL 中暴露的 OkHttp/Coil 类型，理论上仍受传递版本影响；出问题时用 `./gradlew :app:dependencies` 查冲突边。
+
+## Java 与混淆（R8 / ProGuard）
+
+- **Kotlin** 是推荐调用方式。Java 中可通过 `ImageView` 的静态扩展（类名以 **`ImageLoadExtensionsKt`** 为准，见 consumer-rules）调用 `loadImage`，参数较多时可在 Java 中拆成多行，或从 Kotlin 包一层业务方法。
+- 混淆时 **AAR 自带 consumer 规则**；若你仍遇 `loadImage` 在运行时消失，请确认 **未在宿主 ProGuard 中 `-dontshrink` 掉整个 `com.answufeng.image`** 且使用与本库**一致版本**的 Kotlin 元数据相关保留规则（Coil 亦自带 consumer 规则）。
+
+## 持续集成
+
+仓库含 [`.github/workflows/android.yml`](.github/workflows/android.yml)：在 **JDK 17** 下执行 `assembleRelease`、`testDebugUnitTest`、`lintRelease` 与 **demo 的 R8 打包**。
 
 ## 快速开始 (3 steps)
 
@@ -67,8 +84,10 @@ imageView.loadImage("https://example.com/photo.jpg")
 // 圆形头像
 imageView.loadCircle(user.avatarUrl)
 
-// 圆角图片
-imageView.loadRounded(url, radiusDp = 8f)
+// 圆角图片（第二参数为 px，dp 请用 loadRoundedDp）
+imageView.loadRounded(url, 24f)
+// 或
+imageView.loadRoundedDp(url, radiusDp = 8f)
 
 // 带边框的圆形头像
 imageView.loadCircleWithBorder(url, borderWidth = 4f, borderColor = Color.WHITE)
@@ -90,6 +109,8 @@ class App : Application() {
             error(R.drawable.error)
             crossfade(300)
             enableLogging(BuildConfig.DEBUG)
+            // 可选：仅要求 INTERNET、不要求 VALIDATED，减轻强制门户等场景下「误判离线、只走缓存」
+            // strictNetworkForOffline(false)
         }
     }
 }
@@ -105,7 +126,8 @@ class App : Application() {
 │  loadBlur / loadCircleWithBorder        │
 ├─────────────────────────────────────────┤
 │            AwImageScope                 │  ← DSL 配置层
-│  (直接操作 Coil ImageRequest.Builder)    │
+│  raw / addHeader / CachePolicy 等        │
+│  (直接操作 Coil ImageRequest.Builder)     │
 ├─────────────────────────────────────────┤
 │  AwImage (全局配置)  ImagePreloader      │  ← 全局管理层
 │  ImageNetworkMonitor       AwImageLogger │
@@ -174,6 +196,32 @@ imageView.loadImage(url) {
 }
 ```
 
+### 高级：请求头、细粒度缓存、`raw`、多阶段占位
+
+```kotlin
+imageView.loadImage(url) {
+    // CDN / 鉴权
+    addHeader("Authorization", "Bearer $token")
+    // 或
+    // setHeader("User-Agent", "MyApp/1.0")
+
+    // 细粒度缓存（与 disableCache() / memoryCacheOnly() 勿矛盾混用）
+    // memoryCachePolicy(CachePolicy.ENABLED)
+    // diskCachePolicy(CachePolicy.DISABLED)
+
+    // 多阶段：先显示内存里已有的一张小图，再拉全图
+    // placeholderMemoryCacheKey("thumb_key_from_previous_request")
+
+    // 任意未封装参数（勿在 raw 中再设 transformations，会与本库 transform/circle 冲突）
+    raw {
+        // parameters { ... }  // 若需要
+    }
+}
+```
+
+- **`raw { }`**：在应用变换与离线策略之后、绑定监听器之前**依次**执行，适合与 Coil 官方文档一一对应的高级参数。使用 `onProgress` 时不要移除内部进度关联头（`X-AwImage-Progress-Token`），否则进度会失效。
+- **全局 `Init` 中的 Drawable**（`placeholder(Drawable)` 等）在内部已 `mutate()`，**只读**使用，勿在多线程改 Drawable 状态。
+
 ### 内置变换
 
 | 变换 | 说明 |
@@ -213,16 +261,18 @@ lifecycleScope.launch {
     // 单张预加载
     val success: Boolean = ImagePreloader.preload(context, url)
 
-    // 批量预加载（返回每个 URL 的加载结果）
-    val results: List<Boolean> = ImagePreloader.preloadAll(context, urls, concurrency = 8)
-    val successCount = results.count { it }
+    // 批量预加载（返回每个 URL 的加载结果）；可选与展示一致的 ImageRequest 配置
+    val results: List<Boolean> = ImagePreloader.preloadAll(
+        context, urls, concurrency = 8
+    ) { size(200, 200) }
 
     // 获取已缓存的 Drawable
-    val drawable: Drawable? = ImagePreloader.getDrawable(context, url)
+    val drawable: Drawable? = ImagePreloader.getDrawable(context, url) { size(200, 200) }
 }
 ```
 
-> `preloadAll` 默认并发数为 8，可通过 `concurrency` 参数调整。返回 `List<Boolean>` 表示每个 URL 的加载结果。
+> `preloadAll` 默认并发数为 8，可通过 `concurrency` 参数调整。返回 `List<Boolean>` 表示每个 URL 的加载结果。  
+> `preload` / `getDrawable` / `preloadAll` 的最后一个参数可传入与 `loadImage` 中相同的 `ImageRequest` 配置（如 `size()`、`transformations {}` 等），保证预加载与列表展示共用缓存键。
 
 ### 缓存管理
 
@@ -235,11 +285,13 @@ val diskCleared = AwImage.clearDiskCache(context)
 val memSize = AwImage.getMemoryCacheSize(context)
 val diskSize = AwImage.getDiskCacheSize(context)
 
-// 检查是否已缓存
+// 检查是否已缓存（与线加载的 key 须一致，若有尺寸/变换需传入相同配置）
 val cached = AwImage.isCached(context, url)
+val cachedSized = AwImage.isCached(context, url) { size(200, 200) }
 ```
 
-> 缓存清理方法内置异常保护，返回 `Boolean` 表示操作是否成功。
+> 缓存清理方法内置异常保护，返回 `Boolean` 表示操作是否成功。  
+> `isCached` 的第二个重载为 `(context, data) { requestConfig }`，`requestConfig` 与 `loadImage` / `ImageRequest.Builder` 一致；若只传 `data` 则只匹配默认 key。
 
 ### Lifecycle 感知
 
@@ -382,8 +434,16 @@ holder.imageView.loadImage(url) {
 
 ---
 
+## 发版与生产环境检查清单
+
+- [ ] **JDK 17** 构建与 `./gradlew :aw-image:lintRelease :aw-image:testDebugUnitTest` 通过。
+- [ ] **Release** 包在真机/模拟器上打开关键列表与图片（含 SVG、GIF 若用）。
+- [ ] 宿主与传递依赖中 **Coil/OkHttp 无版本冲突**（`./gradlew :app:dependencies`）。
+- [ ] 对网络图使用 **`https`**；`AwImage.init` 中 `enableLogging` 在 release 中应为 **false**。
+- [ ] 对「预加载 + 展示」用 **同一 `size()` / 变换**（或同一 `isCached { }` 配置）以保证缓存键一致。
+
 ## 许可证
 
 Apache License 2.0，详见 [LICENSE](LICENSE)。
 
-# Last updated: 2026年 4月 21日
+# Last updated: 2026年 4月 22日

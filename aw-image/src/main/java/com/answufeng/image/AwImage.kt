@@ -10,7 +10,9 @@ import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.Disposable
+import coil.request.ImageRequest
 import okhttp3.OkHttpClient
+import kotlin.jvm.JvmOverloads
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -44,32 +46,42 @@ annotation class AwImageDsl
  */
 object AwImage {
 
-    /** 全局占位图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
+    /**
+     * 全局占位图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用。
+     * 在 [init] 时从 [ImageConfig] 写入，多线程**读安全**；勿在业务代码中直接修改。
+     */
     @Volatile
     internal var globalPlaceholder: Int = 0
         private set
 
-    /** 全局占位图 Drawable，优先级高于 [globalPlaceholder] */
+    /**
+     * 全局占位 [Drawable]（[init] 时从 [ImageConfig] 中 `mutate` 的副本），优先级高于 [globalPlaceholder]。
+     * **只读使用**：不要在多线程下改变其状态（`setColorFilter` 等），以免与其他页面交叉影响。
+     */
     @Volatile
     internal var globalPlaceholderDrawable: Drawable? = null
         private set
 
-    /** 全局错误图资源 ID，[loadImage][com.answufeng.image.loadImage] 未指定时使用 */
+    /** 全局错误图资源 ID。语义同 [globalPlaceholder]（只读、勿直接改）。 */
     @Volatile
     internal var globalError: Int = 0
         private set
 
-    /** 全局错误图 Drawable，优先级高于 [globalError] */
+    /**
+     * 全局错误图 Drawable（[init] 中 mutate 副本），优先级高于 [globalError]；**只读**使用。
+     */
     @Volatile
     internal var globalErrorDrawable: Drawable? = null
         private set
 
-    /** 全局兜底图资源 ID，data 为 null 时使用 */
+    /** 全局兜底图资源 ID，data 为 null 时使用。只读。 */
     @Volatile
     internal var globalFallback: Int = 0
         private set
 
-    /** 全局兜底图 Drawable，优先级高于 [globalFallback] */
+    /**
+     * 全局兜底图 Drawable，优先级高于 [globalFallback]；**只读**使用。
+     */
     @Volatile
     internal var globalFallbackDrawable: Drawable? = null
         private set
@@ -103,9 +115,11 @@ object AwImage {
      * @param config  可选的 DSL 配置块
      * @return 创建的 [ImageLoader] 实例，方便高级用户进一步定制
      */
-    fun init(context: Context, config: (ImageConfig.() -> Unit)? = null): ImageLoader {
+    fun init(context: Context, config: (ImageConfig.() -> Unit)? = null): ImageLoader = synchronized(AwImage) {
         val appContext = context.applicationContext
         val imageConfig = ImageConfig().apply { config?.invoke(this) }
+
+        ImageNetworkMonitor.isStrictNetworkForOffline = imageConfig.isStrictNetworkForOffline
 
         AwImageLogger.d("AwImage.init: memoryCache=${imageConfig.memoryCachePercent}, " +
                 "diskCache=${imageConfig.diskCacheSize}, gif=${imageConfig.gifEnabled}")
@@ -134,19 +148,18 @@ object AwImage {
                 .build()
         }
 
-        if (imageConfig.gifEnabled) {
+        if (imageConfig.gifEnabled || imageConfig.svgEnabled) {
             builder.components {
-                if (Build.VERSION.SDK_INT >= 28) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
+                if (imageConfig.gifEnabled) {
+                    if (Build.VERSION.SDK_INT >= 28) {
+                        add(ImageDecoderDecoder.Factory())
+                    } else {
+                        add(GifDecoder.Factory())
+                    }
                 }
-            }
-        }
-
-        if (imageConfig.svgEnabled) {
-            builder.components {
-                add(coil.decode.SvgDecoder.Factory())
+                if (imageConfig.svgEnabled) {
+                    add(coil.decode.SvgDecoder.Factory())
+                }
             }
         }
 
@@ -176,7 +189,7 @@ object AwImage {
         Coil.setImageLoader(imageLoader)
         initialized = true
         AwImageLogger.d("AwImage.init: complete")
-        return imageLoader
+        imageLoader
     }
 
     /** 获取当前 ImageLoader 实例 */
@@ -191,11 +204,17 @@ object AwImage {
      */
     fun clearMemoryCache(context: Context): Boolean {
         return runCatching {
-            imageLoader(context).memoryCache?.clear()
+            val cache = imageLoader(context).memoryCache
+            if (cache == null) {
+                AwImageLogger.d("clearMemoryCache: no memory cache")
+                return@runCatching false
+            }
+            cache.clear()
             AwImageLogger.d("clearMemoryCache: success")
+            true
         }.onFailure {
             AwImageLogger.e("clearMemoryCache: failed", it)
-        }.isSuccess
+        }.getOrDefault(false)
     }
 
     /**
@@ -208,11 +227,17 @@ object AwImage {
     @OptIn(coil.annotation.ExperimentalCoilApi::class)
     fun clearDiskCache(context: Context): Boolean {
         return runCatching {
-            imageLoader(context).diskCache?.clear()
+            val cache = imageLoader(context).diskCache
+            if (cache == null) {
+                AwImageLogger.d("clearDiskCache: no disk cache")
+                return@runCatching false
+            }
+            cache.clear()
             AwImageLogger.d("clearDiskCache: success")
+            true
         }.onFailure {
             AwImageLogger.e("clearDiskCache: failed", it)
-        }.isSuccess
+        }.getOrDefault(false)
     }
 
     /**
@@ -245,19 +270,38 @@ object AwImage {
     /**
      * 检查指定数据源是否已缓存。
      *
-     * 优先检查内存缓存，若未命中则检查磁盘缓存。
+     * 使用与 [ImageRequest] 相同的 key 计算方式：先查内存，再查磁盘（命中任一则返回 true）。
+     * 若线加载时使用了 [ImageRequest.Builder] 的 [ImageRequest.Builder.override]、
+     * [ImageRequest.Builder.transformations] 等，请传入 [requestConfig]，使本方法与真实请求的缓存键一致。
      *
-     * @param context Context
-     * @param data    图片数据源（URL / File / @DrawableRes 等）
+     * @param context      Context
+     * @param data         图片数据源（URL / File / @DrawableRes 等）
+     * @param requestConfig 可选，与线加载时相同的 Builder 配置（尺寸、变换等）
      * @return `true` 表示已缓存，`false` 表示未缓存或查询失败
      */
     @OptIn(coil.annotation.ExperimentalCoilApi::class)
-    fun isCached(context: Context, data: Any): Boolean {
+    @JvmOverloads
+    fun isCached(
+        context: Context,
+        data: Any,
+        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
+    ): Boolean {
         return runCatching {
-            val loader = imageLoader(context)
-            loader.memoryCache?.keys?.any { it.first == data } == true && return@runCatching true
-            val diskKey = loader.defaults?.diskCacheKeyResolver?.fromData(data, loader.options)
-            if (diskKey != null && loader.diskCache?.get(diskKey) != null) return@runCatching true
+            val appContext = context.applicationContext
+            val loader = imageLoader(appContext)
+            val builder = ImageRequest.Builder(appContext).data(data)
+            requestConfig?.invoke(builder)
+            val request = builder.build()
+            val memKey = request.memoryCacheKey
+            if (memKey != null && loader.memoryCache?.get(memKey) != null) {
+                return@runCatching true
+            }
+            val diskKey = request.diskCacheKey
+            if (diskKey != null) {
+                loader.diskCache?.openSnapshot(diskKey)?.use {
+                    return@runCatching true
+                }
+            }
             false
         }.onFailure {
             AwImageLogger.e("isCached: failed for data=$data", it)
@@ -300,6 +344,7 @@ object AwImage {
      * 全局配置 DSL 类。
      *
      * 所有属性通过 setter 方法设置，外部不可直接赋值。
+     * 以下 `internal` 存根与 ktlint 约定冲突处已局部抑制，由 [init] 消费，勿在外部包访问。
      */
     @AwImageDsl
     class ImageConfig {
@@ -333,6 +378,13 @@ object AwImage {
 
         /** 是否启用 SVG 解码 */
         var svgEnabled: Boolean = false
+            private set
+
+        /**
+         * 为 true（默认）时，联网判定需 [android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED]；
+         * 为 false 时只要有 INTERNET 即视为在线，减轻强制门户等场景下「误判离线、只走缓存」的情况。
+         */
+        var isStrictNetworkForOffline: Boolean = true
             private set
 
         /** 全局占位图资源 ID */
@@ -380,10 +432,10 @@ object AwImage {
         /** 设置是否启用全局渐入动画 */
         fun crossfade(enabled: Boolean) { crossfadeEnabled = enabled }
 
-        /** 设置全局渐入动画时长（ms），同时自动启用渐入动画 */
+        /** 设置全局渐入动画时长（ms）；为 0 时关闭渐入，与 [AwImageScope.crossfade] 语义一致 */
         fun crossfade(durationMs: Int) {
             crossfadeDuration = durationMs.coerceAtLeast(0)
-            if (durationMs > 0) crossfadeEnabled = true
+            crossfadeEnabled = durationMs > 0
         }
 
         /** 设置是否启用 GIF 解码 */
@@ -391,6 +443,9 @@ object AwImage {
 
         /** 设置是否启用 SVG 解码（默认 false） */
         fun enableSvg(enabled: Boolean) { svgEnabled = enabled }
+
+        /** 设置离线/仅缓存策略使用的联网判定是否必须 VALIDATED（默认 true） */
+        fun strictNetworkForOffline(enabled: Boolean) { isStrictNetworkForOffline = enabled }
 
         /** 设置全局占位图资源 ID */
         fun placeholder(res: Int) { placeholderRes = res }

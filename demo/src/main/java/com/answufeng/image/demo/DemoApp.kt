@@ -12,8 +12,9 @@ class DemoApp : Application() {
             memoryCacheSize(0.25)
             diskCacheSize(256L * 1024 * 1024)
             enableGif(true)
-            placeholder(ColorDrawable(Color.parseColor("#FFE0E0E0")))
-            error(ColorDrawable(Color.parseColor("#FFFFCDD2")))
+            enableSvg(true)
+            placeholder(ColorDrawable(Color.parseColor("#FFE2E8F0")))
+            error(ColorDrawable(Color.parseColor("#FFFEE2E2")))
             enableLogging(true)
         }
     }
