@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="demo_playbook_menu">演示清单</string>
+    <string name="demo_playbook_title">演示清单</string>
+    <string name="demo_playbook_message">入口与能力索引见仓库 demo/DEMO_MATRIX.md。\n\n• 基础加载 / 变换 / 列表 / 预加载\n• GIF / 缓存 / 集成示例\n\n缓存页说明与 README「内存与列表」一致。</string>
+    <string name="cache_trim_memory_hint">系统内存紧张时会收到 onTrimMemory；可调用 AwImage.onTrimMemory(level) 或 clearMemoryCache。下方按钮用于手动验证清理效果，详见 README「内存与列表」。</string>
+</resources>

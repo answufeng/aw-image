@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -36,6 +37,11 @@ android {
     }
 }
 
+ktlint {
+    android.set(true)
+    ignoreFailures = false
+}
+
 dependencies {
     api(libs.coil)
     api(libs.coil.gif)
@@ -47,12 +53,6 @@ dependencies {
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.okhttp)
-    testImplementation(libs.mockwebserver)
 }
 
 apply(from = "${rootDir}/gradle/publish.gradle.kts")

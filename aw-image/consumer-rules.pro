@@ -1,5 +1,6 @@
 # aw-image consumer ProGuard rules
 # 精准保留公开 API，避免过度混淆
+# 宿主 release 可配合 -printusage 抽样，逐步收紧 -keepclassmembers（需回归 loadImage / DSL）
 
 # ===========================================================
 # 全局配置入口

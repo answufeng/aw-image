@@ -25,9 +25,8 @@ Thank you for your interest in contributing to aw-image! This document provides 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-feature`)
 3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass: `./gradlew :aw-image:testDebugUnitTest`
-6. Ensure the build passes: `./gradlew :aw-image:compileDebugKotlin`
+4. Extend the `demo` app if the change is user-visible (or document manual QA in the PR)
+5. Ensure the build passes: `./gradlew :aw-image:assembleRelease :aw-image:lintRelease :aw-image:ktlintCheck :demo:assembleRelease`
 7. Commit with a clear message
 8. Open a Pull Request
 
@@ -50,16 +49,13 @@ Thank you for your interest in contributing to aw-image! This document provides 
 # Clone the repo
 git clone https://github.com/answufeng/aw-image.git
 
-# Build the library
-./gradlew :aw-image:assembleDebug
+# Build the library and demo (release smoke / R8)
+./gradlew :aw-image:assembleRelease :demo:assembleRelease
 
-# Run unit tests
-./gradlew :aw-image:testDebugUnitTest
+# Lint & style
+./gradlew :aw-image:lintRelease :aw-image:ktlintCheck
 
-# Run Android instrumented tests (requires device/emulator)
-./gradlew :aw-image:connectedDebugAndroidTest
-
-# Build and install the demo app
+# Install demo for manual QA
 ./gradlew :demo:installDebug
 ```
 

@@ -7,5 +7,10 @@
         android:title="切换深色模式"
         android:icon="@android:drawable/ic_menu_day"
         app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_demo_playbook"
+        android:title="@string/demo_playbook_menu"
+        app:showAsAction="never" />
 </menu>
 

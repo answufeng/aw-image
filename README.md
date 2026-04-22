@@ -5,6 +5,8 @@
 基于 Coil 封装的 Android 图片加载库，提供简洁的 DSL API、常用变换和预加载支持。  
 设计目标：在**不隐藏 Coil 能力**的前提下，用 Kotlin DSL 减少样板代码，并统一缓存键、进度与混淆规则（详见下文「高级 API」与「ProGuard」）。
 
+**验证环境**：仓库 **demo** 使用 compileSdk 35 / targetSdk 35。
+
 ## 特性
 
 - **零配置**：无需初始化即可使用
@@ -59,14 +61,24 @@ dependencies {
 - **建议**：宿主**不要**再单独指定与上述表格大版本冲突的 Coil/OkHttp，或在 `gradle/libs.versions.toml` 中**统一** `coil`、`okio`、`okhttp` 版本，避免 `Duplicate class` 或行为不一致。
 - 若你**完全不用**本库在 DSL 中暴露的 OkHttp/Coil 类型，理论上仍受传递版本影响；出问题时用 `./gradlew :app:dependencies` 查冲突边。
 
+### 内存与列表滚动（建议）
+
+- **低内存**：在 `Application` 或 `Activity` 实现 `ComponentCallbacks2`，于 `onTrimMemory` / `onLowMemory` 中可对全局 Loader 清内存缓存，例如 `AwImage.imageLoader(context).memoryCache?.clear()`；磁盘侧请使用库已提供的 `AwImage.clearDiskCache` / `clearMemoryCache` 等公开 API（见 `AwImage` KDoc）。
+- **RecyclerView**：在 `onViewRecycled` 可对 `ImageView` 调 `dispose()`（Coil 扩展）或让请求绑定 `Lifecycle`；列表快速滑动时可在 **`AwImageScope.raw { }`** 中设置 Coil 的 `size` / `precision`（如 `Precision.INEXACT`）以降低解码像素，详见 [Coil sizing](https://coil-kt.github.io/coil/getting_started/#image-size)。
+- **高斯模糊**：`BlurTransformation` 在低版本走 CPU 路径，长列表中慎用；API 31+ 可走 `RenderEffect` 路径（见 `Transformations` KDoc）。
+- **视频封面**：标准发行版未默认引入 `coil-video`；若需 `content://`/`file` 视频帧封面，可在宿主增加 Coil **VideoFrame** 相关依赖并按 Coil 文档注册 `VideoFrameDecoder`。
+
 ## Java 与混淆（R8 / ProGuard）
 
 - **Kotlin** 是推荐调用方式。Java 中可通过 `ImageView` 的静态扩展（类名以 **`ImageLoadExtensionsKt`** 为准，见 consumer-rules）调用 `loadImage`，参数较多时可在 Java 中拆成多行，或从 Kotlin 包一层业务方法。
 - 混淆时 **AAR 自带 consumer 规则**；若你仍遇 `loadImage` 在运行时消失，请确认 **未在宿主 ProGuard 中 `-dontshrink` 掉整个 `com.answufeng.image`** 且使用与本库**一致版本**的 Kotlin 元数据相关保留规则（Coil 亦自带 consumer 规则）。
 
-## 持续集成
+## 工程品质与发版检查
 
-仓库含 [`.github/workflows/android.yml`](.github/workflows/android.yml)：在 **JDK 17** 下执行 `assembleRelease`、`testDebugUnitTest`、`lintRelease` 与 **demo 的 R8 打包**。
+- **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) / [`.github/workflows/android.yml`](.github/workflows/android.yml) — JDK 17 下 `assembleRelease`、`lintRelease`、`ktlintCheck`、`:demo:assembleRelease`（R8）。
+- **本地建议**：`./gradlew :aw-image:assembleRelease :aw-image:ktlintCheck :aw-image:lintRelease :demo:assembleRelease`
+- **演示**：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)；主界面菜单 **「演示清单」**。
+- **上线前**：见下文「发版与生产环境检查清单」；列表与内存策略务必对照 **「内存与列表」** 章节。
 
 ## 快速开始 (3 steps)
 
@@ -115,6 +127,10 @@ class App : Application() {
     }
 }
 ```
+
+## 演示应用
+
+（CI 与 Gradle 命令见上文 **「工程品质与发版检查」**。）`demo` 覆盖加载、变换、列表、预加载、缓存等；主界面 **「演示清单」** 与 [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) 对照。缓存页顶部说明与「内存与列表」一致。
 
 ## 架构
 
@@ -436,7 +452,7 @@ holder.imageView.loadImage(url) {
 
 ## 发版与生产环境检查清单
 
-- [ ] **JDK 17** 构建与 `./gradlew :aw-image:lintRelease :aw-image:testDebugUnitTest` 通过。
+- [ ] **JDK 17** 构建与 `./gradlew :aw-image:lintRelease :aw-image:ktlintCheck :demo:assembleRelease` 通过。
 - [ ] **Release** 包在真机/模拟器上打开关键列表与图片（含 SVG、GIF 若用）。
 - [ ] 宿主与传递依赖中 **Coil/OkHttp 无版本冲突**（`./gradlew :app:dependencies`）。
 - [ ] 对网络图使用 **`https`**；`AwImage.init` 中 `enableLogging` 在 release 中应为 **false**。

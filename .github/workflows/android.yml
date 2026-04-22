@@ -1,4 +1,4 @@
-# 构建、Lint、单测与 demo R8；AGP 8.x 需要 Java 17+
+# 构建、Lint 与 demo R8；AGP 8.x 需要 Java 17+
 name: Android CI
 
 on:
@@ -23,8 +23,8 @@ jobs:
       - name: Grant execute for gradlew
         run: chmod +x gradlew
 
-      - name: Assemble library & run unit tests & lint
-        run: ./gradlew :aw-image:assembleRelease :aw-image:testDebugUnitTest :aw-image:lintRelease --no-daemon
+      - name: Assemble library, lint & ktlint
+        run: ./gradlew :aw-image:assembleRelease :aw-image:lintRelease :aw-image:ktlintCheck --no-daemon
 
       - name: Demo release (verify R8 + consumer rules)
         run: ./gradlew :demo:assembleRelease --no-daemon

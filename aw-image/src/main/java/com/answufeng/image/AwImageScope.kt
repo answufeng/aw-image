@@ -285,6 +285,9 @@ class AwImageScope internal constructor(
      * [ImageRequest.Builder.transformations]，因此 **不要** 在 `raw` 中再设 `transformations`，
      * 否则会被库侧变换覆盖；请求头、单独 `size`、额外 `tag` 等可安全放在 `raw` 中。
      * **不要** 移除或覆盖 [ProgressInterceptor.PROGRESS_TOKEN_HEADER]（[onProgress] 依赖）。
+     *
+     * Coil [ImageRequest.Builder] 全量 API 见官方文档：
+     * https://coil-kt.github.io/coil/api/coil-request/-image-request/-builder/
      */
     fun raw(block: ImageRequest.Builder.() -> Unit) {
         rawBlocks.add(block)
