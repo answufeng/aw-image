@@ -89,7 +89,7 @@ dependencies {
 
 ## 工程品质与发版检查
 
-- **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) / [`.github/workflows/android.yml`](.github/workflows/android.yml) — JDK 17 下 `assembleRelease`、`lintRelease`、`ktlintCheck`、`:demo:assembleRelease`（R8）。
+- **CI**：[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — **JDK 17** 下串联 `:aw-image:assembleRelease`、`:aw-image:lintRelease`、`:aw-image:ktlintCheck`、`:demo:assembleRelease`，失败时仍上传 `aw-image/build/reports/` 供排查。
 - **本地建议**：`./gradlew :aw-image:assembleRelease :aw-image:ktlintCheck :aw-image:lintRelease :demo:assembleRelease`
 - **演示**：[demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md)；主界面菜单 **「演示清单」**。
 - **上线前**：见下文「发版与生产环境检查清单」；列表与内存策略务必对照 **「内存与列表」** 章节。
@@ -135,6 +135,7 @@ class App : Application() {
             error(R.drawable.error)
             crossfade(300)
             enableLogging(BuildConfig.DEBUG)
+            // logTag("MyApp-Img")  // 可选，默认 aw-image
             // 可选：仅要求 INTERNET、不要求 VALIDATED，减轻强制门户等场景下「误判离线、只走缓存」
             // strictNetworkForOffline(false)
         }
@@ -302,7 +303,8 @@ lifecycleScope.launch {
 ```
 
 > `preloadAll` 默认并发数为 8，可通过 `concurrency` 参数调整。返回 `List<Boolean>` 表示每个 URL 的加载结果。  
-> `preload` / `getDrawable` / `preloadAll` 的最后一个参数可传入与 `loadImage` 中相同的 `ImageRequest` 配置（如 `size()`、`transformations {}` 等），保证预加载与列表展示共用缓存键。
+> `preload` / `getDrawable` / `preloadAll` 的最后一个参数可传入与 `loadImage` 中相同的 `ImageRequest` 配置（如 `size()`、`transformations {}` 等），保证预加载与列表展示共用缓存键。  
+> **离线**：无网络时预加载默认与 `loadImage` 一样仅使用缓存（在应用 `requestConfig` 之前生效）；若需在离线仍尝试网络，在配置块里设置 `networkCachePolicy` 覆盖。
 
 ### 缓存管理
 
@@ -377,10 +379,12 @@ imageView.loadImage(url) {
 | 渐入动画 | `crossfade(enabled)` / `crossfade(ms)` | true / 200ms |
 | GIF 支持 | `enableGif(enabled)` | true |
 | SVG 支持 | `enableSvg(enabled)` | false |
+| 离线判定（是否要求 VALIDATED） | `strictNetworkForOffline(enabled)` | true（要求已验证网络；`false` 时仅要求 INTERNET） |
 | 全局占位图 | `placeholder(resId)` / `placeholder(Drawable)` | 0 (不设置) |
 | 全局错误图 | `error(resId)` / `error(Drawable)` | 0 (不设置) |
 | 全局兜底图 | `fallback(resId)` / `fallback(Drawable)` | 0 (不设置) |
 | 自定义网络层 | `okHttpClient(OkHttpClient)` | Coil 默认 |
+| Logcat tag | `logTag(name)` | `aw-image` |
 | 调试日志 | `enableLogging(enabled)` | false |
 
 ### 从 Glide/Picasso 迁移
@@ -399,6 +403,10 @@ imageView.loadImage(url) {
 ---
 
 ## FAQ
+
+### Q: `onProgress` 不回调？
+
+仅当 `loadImage` 的 **data 为 http(s) 字符串** 时才会注册 OkHttp 进度（`Uri`、资源 id、本地路径等不走该路径）。同一请求请勿去掉内部进度头（见上文「高级 API」）。
 
 ### Q: 如何取消单个图片加载请求？
 
@@ -450,7 +458,7 @@ AwImage.init(this) {
 
 ### Q: 多次调用 `AwImage.init()` 会怎样？
 
-会覆盖之前的所有配置。建议仅在 `Application.onCreate()` 中调用一次。
+会覆盖之前的所有配置（含 ImageLoader、占位/错误图、crossfade 等）。每次调用还会先把内部日志开关与 **Logcat tag** 重置为默认（关闭、`aw-image`），再在配置块里应用当次的 `enableLogging` / `logTag`。建议仅在 `Application.onCreate()` 中调用一次。
 
 ### Q: 如何在 RecyclerView 中避免图片闪烁？
 
