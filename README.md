@@ -2,64 +2,65 @@
 
 [![JitPack](https://jitpack.io/v/answufeng/aw-image.svg)](https://jitpack.io/#answufeng/aw-image)
 
-在 Android 上基于 **Coil 2.7**、面向 **`ImageView` + XML** 的图片加载库：用 Kotlin **DSL** 减样板代码，不屏蔽 Coil 能力；附 **进度、缓存键与 [R8 规则](aw-image/consumer-rules.pro)**。Compose 请直接用官方 `coil-compose`。
+**一句话**：在 Android 上封装 **Coil 2.7**，用 Kotlin **DSL** 给 **`ImageView`（XML / View 体系）** 用；不挡 Coil 自带能力。进度、缓存键与 [R8 consumer 规则](aw-image/consumer-rules.pro) 已备。**Compose** 请用官方 `coil-compose`，本库不包一层。
 
 | | |
-|:---|:---|
-| **发布版本** | `1.0.0`（与 [Git 标签](https://github.com/answufeng/aw-image/tags) / JitPack 一致） |
-| **环境** | minSdk 24，demo 使用 compileSdk 35、**JDK 17** 构建 |
-| **示例** | [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
+|:--|:--|
+| **当前版本** | `1.0.0`（[Git 标签](https://github.com/answufeng/aw-image/tags) / JitPack 同名） |
+| **范围** | minSdk **24**；本仓库用 compileSdk 35、**JDK 17** 跑 CI / demo |
+| **示例** | 见 [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
 
-**阅读顺序**：下面先 [引入](#依赖) → [三行起步](#三行起步) → 需要时再看 [功能](#功能概览) 与 [进阶](#进阶) → [易踩坑](#易踩坑) / [排错](#排错) 。
+**目录**：[安装](#安装) · [快速上手](#快速上手) · [易踩坑](#易踩坑) · [能做什么](#能做什么) · [进阶](#进阶) · [工程与平台](#工程与平台) · [常见问题](#常见问题) · [发版与维护](#发版与维护) · [许可证](#许可证)
 
 ---
 
-## 依赖
+## 安装
 
-[JitPack](https://jitpack.io/#answufeng/aw-image) 加仓库后：
+1. 在 [JitPack](https://jitpack.io/#answufeng/aw-image) 使用的 `repositories` 里加上 `https://jitpack.io`。  
+2. 对 module 下依赖（版本号与 **Git 标签**一致）：
 
 ```kotlin
-// settings.gradle.kts — repositories
-maven { url = uri("https://jitpack.io") }
-
-// app — build.gradle.kts
 dependencies {
     implementation("com.github.answufeng:aw-image:1.0.0")
 }
 ```
 
-- 对 Coil / `coil-gif` / OkHttp 使用 `api`，一般不必再 `implementation(coil)`；版本冲突时在宿主统一 `coil` / `okhttp` / `okio`。
-- Release 请验证图片在 **混淆** 下正常（AAR 已带 consumer 规则）。
+**说明**
 
-**传递版本（参考）**
+- 本库对 Coil / `coil-gif` / OkHttp 使用 `api`，多数项目**不必**再写 `implementation(coil)`。多模块冲突时请在宿主**统一** `coil` / `okhttp` / `okio` 版本。  
+- **Release** 请在混淆包上点一遍图片与列表；AAR 已含 consumer 规则。  
 
-|  |  |
-|--|--|
-| Coil / coil-gif / coil-svg | 2.7.0 |
+**本库随带的传递版本（供对齐依赖时参考）**
+
+| 组件 | 版本 |
+|------|------|
+| Coil、coil-gif、coil-svg | 2.7.0 |
 | OkHttp | 4.12.0 |
 | kotlinx-coroutines | 1.9.0 |
 
 ---
 
-## 三行起步
+## 快速上手
 
-**1. 不初始化也能用**
+> 不调用 `AwImage.init` 也可以加载；全局配置是可选的。
+
+**加载一张图**
 
 ```kotlin
 imageView.loadImage("https://example.com/photo.jpg")
 ```
 
-**2. 常见封装**
+**常用扩展**
 
 ```kotlin
 imageView.loadCircle(avatarUrl)
-imageView.loadRounded(url, 24f)   // 或 loadRoundedDp(url, 8f)
+imageView.loadRounded(url, 24f)                    // 或 loadRoundedDp(url, 8f)
 imageView.loadSquare(url, edgePx = 200) { roundedCorners(8f) }
 imageView.loadWithAspectRatio(url, 16, 9, maxEdgePx = 400)
 imageView.loadImage(url, config = AwImagePresets.listThumbnail(200))
 ```
 
-**3. 全局配置（建议只在 `Application` 调一次）**
+**全局初始化**（建议只在 `Application` 做一次；每次执行会先关日志、把 Logcat tag 设回 `aw-image`，再跑块内配置）
 
 ```kotlin
 AwImage.init(this) {
@@ -70,45 +71,46 @@ AwImage.init(this) {
     logTag("MyApp-Img")
     enableLogging(BuildConfig.DEBUG)
 }
+// 低内存时可在 onTrimMemory 中：AwImage.onApplicationTrimMemory(this, level)
 ```
-
-每次 `init` 会先把日志关掉、Logcat tag 设回 `aw-image`，再执行块内内容。低内存时可在 `onTrimMemory` 里调用 `AwImage.onApplicationTrimMemory(this, level)`。
-
----
-
-## 功能概览
-
-| 方向 | 内容 |
-|------|------|
-| **API** | `loadImage` / `loadCircle` / `loadRounded`·`loadRoundedDp` / `loadCircleWithBorder` / `loadBlur` / `loadSquare` / `loadWithAspectRatio`；`AwImageScope` 直连 `ImageRequest.Builder`，支持 `raw { }` |
-| **预设** | `AwImagePresets.listThumbnail`、`avatar` 等，减少重复 `override` |
-| **预加载** | `ImagePreloader.preload` / `preloadAll` / `getDrawable`（可限并发） |
-| **效果** | 灰度、颜色滤镜、边框、模糊、裁切、水印等 `Transformation` |
-| **缓存** | 清内存/磁盘、查占用、`isCached`；可自定义 `memoryCacheKey` / `diskCacheKey` 与磁盘目录 |
-| **其它** | GIF；SVG 默认关；占位/错误/兜底；`data == null` 走 fallback 链；离线时优先缓存；`lifecycle` 绑定；`onProgress`（仅 http(s) String，**子线程**回调需 `view.post`）；`defaultRequestListener` 与单次监听合并（先全局） |
 
 ---
 
 ## 易踩坑
 
-| 不要 | 建议 |
+| 情况 | 建议 |
 |------|------|
-| 列表/大图不限制解码尺寸 | 与显示区域一致，或用 `loadSquare` / `loadWithAspectRatio` / 预设 |
-| 预加载和界面用的 **size/变换** 不一致 | 同一套配置或同一套 key，否则重复解码 |
-| Release 里长期 `enableLogging(true)` | 用 `BuildConfig.DEBUG` 或短期排查时打开 |
+| 列表/大图不限制**解码尺寸** | 和控件展示尺寸对齐；用 `loadSquare` / `loadWithAspectRatio` 或 [AwImagePresets](aw-image/src/main/java/com/answufeng/image/AwImagePresets.kt) |
+| **预加载**和界面加载的 size / 变换不一致 | 同一套 `ImageRequest` 相关配置，否则易重复下、重复解 |
+| Release **长期**打开详细日志 | 用 `BuildConfig.DEBUG` 或仅排障时短期 `enableLogging(true)` |
+
+---
+
+## 能做什么
+
+| 类别 | 说明 |
+|------|------|
+| 扩展入口 | `loadImage`、`loadCircle`、`loadRounded` / `loadRoundedDp`、`loadCircleWithBorder`、`loadBlur`、`loadSquare`、`loadWithAspectRatio` |
+| DSL | `AwImageScope` 直配 `ImageRequest.Builder`，`raw { }` 可写 Coil 里未再封一层的项 |
+| 预设 | `AwImagePresets.listThumbnail`、`avatar` 等，少写重复 `override` |
+| 预加载 | `ImagePreloader`：单张、批量、并发上限、`getDrawable` |
+| 变换 | 灰度、色滤、边框、模糊、裁切、水印等（见包内 `*Transformation`） |
+| 缓存与键 | 清内存/盘、查占用、`isCached`；`memoryCacheKey` / `diskCacheKey`、磁盘目录可配 |
+| 其它 | GIF；SVG 默认关；占位/错图/兜底；`data==null` 只走 fallback；无网时偏缓存；`lifecycle`；`onProgress`（仅 **http(s) 的 String**，回调可能在子线程 → **`view.post`**）；`defaultRequestListener` 与单次监听合并，**先全局** |
 
 ---
 
 ## 进阶
 
-**DSL 规则（摘）**
+**规则摘要**
 
-- `override(w, h)` 须 **> 0**；`memoryCacheKey` / `diskCacheKey` 与 `isCached`、预加载要一致才命中。  
-- `disableCache` / `memoryCacheOnly` / 各 `CachePolicy` 不要互相矛盾。  
-- `raw { }` 在库内变换、离线策略**之后**执行；**别在 `raw` 里再设 `transformations`**，会和 `circle()` / `transform()` 抢。  
-- `onProgress` 依赖头 `X-AwImage-Progress-Token`，勿删。`init` 里给的 `Drawable` 已 `mutate()`，只读。  
+- `override(w,h)` 的宽高须 **&gt; 0**。自定义 key 时与 `isCached`、预加载**同一套**，才命中。  
+- `disableCache` / `memoryCacheOnly` / 各 `CachePolicy` 勿互相打架。  
+- 库在应用 `transform` / `circle` 等**之后**才跑 `raw { }`；**勿在 `raw` 里再设 `transformations`**。  
+- `onProgress` 依赖内部头 `X-AwImage-Progress-Token`。**`init` 里给的 Drawable 已 `mutate()`，只读。**
 
-**一段完整 DSL 示例**
+<details>
+<summary><b>完整 DSL 示例（点击展开）</b></summary>
 
 ```kotlin
 imageView.loadImage(url) {
@@ -127,20 +129,24 @@ imageView.loadImage(url) {
 }
 ```
 
-**头与 `raw`**
+</details>
+
+<details>
+<summary><b>请求头与 <code>raw</code></b></summary>
 
 ```kotlin
 imageView.loadImage(url) {
     addHeader("Authorization", "Bearer $token")
-    raw { /* 未封装的 ImageRequest.Builder 项 */ }
+    raw { /* 其余 ImageRequest.Builder 配置，勿在此处再设 transformations */ }
 }
 ```
 
-**变换类**
+</details>
 
-`GrayscaleTransformation` · `ColorFilterTransformation` · `BorderTransformation` · `BlurTransformation` · `CropTransformation` · `WatermarkTransformation`（见源码 KDoc）。
+**变换类名**：`GrayscaleTransformation`、`ColorFilterTransformation`、`BorderTransformation`、`BlurTransformation`、`CropTransformation`、`WatermarkTransformation`（见 KDoc）。
 
-**预加载**
+<details>
+<summary><b>预加载与缓存（代码片段）</b></summary>
 
 ```kotlin
 lifecycleScope.launch {
@@ -148,78 +154,87 @@ lifecycleScope.launch {
     ImagePreloader.preloadAll(context, urls, concurrency = 8) { size(200, 200) }
     ImagePreloader.getDrawable(context, url) { size(200, 200) }
 }
+
+// 清理与查询
+AwImage.clearMemoryCache(context)
+AwImage.clearDiskCache(context)
+AwImage.isCached(context, url) { size(200, 200) }
 ```
 
-**缓存 API**
+</details>
 
-`clearMemoryCache` · `clearDiskCache` · `getMemoryCacheSize` · `getDiskCacheSize` · `isCached(context, data) { size(...) }`
+<details>
+<summary><b><code>AwImage.init</code> 常用项（完整见 <code>ImageConfig</code> KDoc）</b></summary>
 
-**`AwImage.init` 常用项（完整见 `ImageConfig` KDoc）**
-
-| 方法 / 能力 | 默认 |
-|-------------|------|
-| `memoryCacheSize` / `memoryCacheMaxSize` / `diskCacheSize` / `diskCacheDir` | 25% 内存 / 按百分比 / 100MB 磁盘 / `cache/…/aw_image_cache` |
+| 配置 | 默认 |
+|------|------|
+| `memoryCacheSize` / `memoryCacheMaxSize` / `diskCacheSize` / `diskCacheDir` | 如 25% 内存、磁盘约 100MB、目录在 cache 下 `aw_image_cache` 等 |
 | `crossfade` | 开，200ms |
 | `enableGif` / `enableSvg` | true / false |
-| `strictNetworkForOffline` | true（要 VALIDATED 网络） |
+| `strictNetworkForOffline` | true（与「是否已验证网络」等策略相关） |
 | `placeholder` / `error` / `fallback` | 未设 |
-| `okHttpClient` | 内部默认 + 进度拦截器 |
-| `defaultRequestListener` | 无（有则与单次请求监听合并，**先**执行全局） |
-| `logTag` / `enableLogging` | `aw-image` / false |
+| `okHttpClient` | 库内默认 + 下载进度拦截 |
+| `defaultRequestListener` | 无；若设，与**单次**监听合并，**先**跑全局 |
+| `logTag` / `enableLogging` | `aw-image` / false；每次 `init` 先 reset 再套本次块 |
 
-**自 Glide 换过来（对照）**  
-`into(iv)` → `iv.loadImage`；`placeholder`/`error` 同 DSL；`circleCrop` → `loadCircle`；圆角 → `loadRounded`；`skipMemoryCache` → `disableCache` 等。
+</details>
+
+**从 Glide 换过来（对照）**  
+`into(imageView)` → `imageView.loadImage`；`placeholder` / `error` 用法类似；`circleCrop` → `loadCircle`；圆角 → `loadRounded`；`skipMemoryCache` 一类需求 → `disableCache` 等。
 
 ---
 
-## 运行与工程
+## 工程与平台
 
-- **Java**：可调用 `ImageView` 扩展，类名多为 `ImageLoadExtensionsKt`；优先 Kotlin。  
-- **R8 / ProGuard**：不要整包 `dontshrink` 掉 `com.answufeng.image`；与 Kotlin 元数据保留策略兼容。  
-- **列表与内存**：列表项要约束解码大小；[Coil 尺寸](https://coil-kt.github.io/coil/getting_started/#image-size) 可配合 `raw` 设 `precision`；模糊在低端机慎用长列表。  
-- **视频帧**：本库未带 `coil-video`；需时在宿主加依赖并注册 `VideoFrameDecoder`。  
+- **Java**：可调用 `ImageView` 上的扩展，生成类名常见为 **`ImageLoadExtensionsKt`**。  
+- **R8**：勿整段 `dontshrink` 掉 `com.answufeng.image`；与 Kotlin/Coil 的 keep 策略一并考虑。  
+- **列表与内存**：必须约束**解码**尺寸；需要时再打开 [Coil 文档 · 尺寸](https://coil-kt.github.io/coil/getting_started/#image-size) 用 `raw` 等配 `precision`。长列表慎用重模糊。  
+- **视频帧封面**：本 AAR 不含 `coil-video`；在宿主加依赖并注册 `VideoFrameDecoder` 即可与 Coil 一致使用。  
 - **CI**：[.github/workflows/ci.yml](.github/workflows/ci.yml)（JDK 17 下 `assemble` / `lint` / `ktlint` / `demo:assembleRelease`）。
 
 ---
 
-## 排错
+## 常见问题
+
+**现象与处理**
 
 | 现象 | 处理 |
 |------|------|
-| `override` 抛 `IllegalArgumentException` | 宽高用正数 |
-| `onProgress` 不回调 / UI 不更新 | 仅 `String` URL；回调可能在子线程，用 `view.post` |
-| Release 里扩展「没了」 | 用 AAR 自带 consumer 规则，勿误删 shrink 范围 |
-| 同 URL 预加载和界面各下一遍 | 统一 `size`、变换或自定义 key |
-| 想要请求 **priority** | Coil 2.7 无此字段；用拦截/队列或升级 Coil 大版本后自接 |
+| `override` 报非法参数 | 宽、高用正整数 |
+| `onProgress` 没有或 UI 不刷 | 仅 **String** 的 **http(s)** 会走；回调可能在子线程，**`view.post`** 更新 View |
+| Release 里扩展找不到 | 确认 consumer 规则生效、勿误伤 shrink |
+| 预加载和界面各拉一次 | 统一 **size/变换/自定义 key** |
+| 需要**请求 priority** | Coil 2.7 无统一 priority API；在业务层排队或升大版本后按 Coil 新 API 自接 |
 
-**常见问答**
+**短答**
 
 | 问 | 答 |
 |----|----|
-| 怎么取消？ | 返回的 `Disposable.dispose()`，或 `tag` + `AwImage.cancelByTag`，或 `lifecycle` |
-| `data == null`？ | 不发起请求，只走 fallback 链 |
-| 多次 `init`？ | 全量覆盖；且每次先 reset 再应用块内容 |
-| RecyclerView 闪图？ | 先管准 `size`；可配合 `memoryCacheOnly` 与 `lifecycle` |
+| 怎么取消？ | `Disposable.dispose()`，或 `tag` + `AwImage.cancelByTag`，或绑定 `lifecycle` |
+| `data == null`？ | 不发起请求，只走全局/DSL 的 fallback 链 |
+| 多次 `AwImage.init`？ | 全量覆盖；且每次**先** reset 日志与 tag 再套本次块 |
+| RecyclerView 闪动？ | 先保证**尺寸/缓存键**；可试 `memoryCacheOnly` + `lifecycle` |
 
 ---
 
-## 发版前自检
+## 发版与维护
 
-- [ ] JDK 17，本地/CI：`ktlint`、`lint`、`demo` Release 构建通过  
-- [ ] 真机测网络图、列表、**混淆**包  
-- [ ] 宿主无多份 Coil/OkHttp 冲突；生产关日志、图片用 **https**；预加载与展示 **同尺寸/同 key**
+**集成方发版前可自检**
 
----
+- [ ] JDK 17；`ktlint` / `lint` / `demo:assembleRelease` 过  
+- [ ] 真机看网络图、列表、**混淆**包  
+- [ ] 无重复 Coil/OkHttp；生产关日志；图床 **https**；预加载与展示 **同键**
 
-## 维护者（JitPack 发版）
+**本库在 JitPack 发新版的常规步骤**
 
-1. [gradle.properties](gradle.properties) 里 `VERSION_NAME` 与打的 **Git 标签**一致。  
-2. `git tag <版本> && git push origin <版本>`。  
-3. 打开 [JitPack 项目页](https://jitpack.io/#answufeng/aw-image) 对应该标签 **Get it / Build**。  
+1. [gradle.properties](gradle.properties) 里 `VERSION_NAME` 与 **Git 标签**一致。  
+2. `git tag <x.y.z> && git push origin <x.y.z>`。  
+3. 打开 [JitPack](https://jitpack.io/#answufeng/aw-image) 对应该标签 **Build / Get**。
+
 依赖形式：`com.github.answufeng:aw-image:<标签>`
 
 ---
 
 ## 许可证
 
-[Apache-2.0](LICENSE) · 文档随 **1.0.0** 更新
+[Apache-2.0](LICENSE) · 文档与 **`1.0.0`** 同步
