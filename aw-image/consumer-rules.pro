@@ -13,6 +13,7 @@
     public *** clearDiskCache(...);
     public *** getMemoryCacheSize(...);
     public *** getDiskCacheSize(...);
+    public *** onApplicationTrimMemory(...);
     public *** isCached(...);
     public *** cancelByTag(...);
     public *** cancelAllTaggedRequests();
@@ -34,6 +35,8 @@
     public *** fallback(...);
     public *** okHttpClient(...);
     public *** enableLogging(...);
+    public *** logTag(...);
+    public *** defaultRequestListener(...);
     public double getMemoryCachePercent();
     public long getDiskCacheSize();
     public boolean isCrossfadeEnabled();
@@ -57,6 +60,8 @@
     public *** circle();
     public *** roundedCorners(...);
     public *** override(...);
+    public *** memoryCacheKey(...);
+    public *** diskCacheKey(...);
     public *** disableCache();
     public *** offlineCacheEnabled(...);
     public *** memoryCacheOnly();
@@ -135,4 +140,15 @@
     public static *** loadRoundedDp(...);
     public static *** loadCircleWithBorder(...);
     public static *** loadBlur(...);
+    public static *** loadSquare(...);
+    public static *** loadWithAspectRatio(...);
+}
+
+# ===========================================================
+# 预设 DSL 片段
+# ===========================================================
+
+-keepclassmembers class com.answufeng.image.AwImagePresets {
+    public *** listThumbnail(...);
+    public *** avatar(...);
 }

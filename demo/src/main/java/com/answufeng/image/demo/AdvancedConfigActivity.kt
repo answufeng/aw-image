@@ -13,6 +13,8 @@ import com.answufeng.image.loadCircleWithBorder
 import com.answufeng.image.loadImage
 import com.answufeng.image.loadRounded
 import com.answufeng.image.loadRoundedDp
+import com.answufeng.image.loadSquare
+import com.answufeng.image.loadWithAspectRatio
 
 class AdvancedConfigActivity : AppCompatActivity() {
 
@@ -117,16 +119,49 @@ class AdvancedConfigActivity : AppCompatActivity() {
             }
         })
 
-        layout.addView(TextView(this).apply { text = "\nNo cache:" })
+        layout.addView(TextView(this).apply { text = "\nNo cache (disableCache):" })
         layout.addView(ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(200, 200)
-            loadImage(url) { noCache() }
+            loadImage(url) { disableCache() }
         })
 
         layout.addView(TextView(this).apply { text = "\nOverride size (100x100):" })
         layout.addView(ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(200, 200)
             loadImage(url) { override(100, 100) }
+        })
+
+        val progressLabel = TextView(this).apply {
+            text = "onProgress: waiting…"
+            textSize = 12f
+        }
+        layout.addView(TextView(this).apply {
+            text = "\nonProgress (https; 回调在后台线程，需 post 更新 UI):"
+        })
+        layout.addView(progressLabel)
+        layout.addView(ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(200, 200)
+            loadImage("https://picsum.photos/1200/1200") {
+                onProgress { cur, total ->
+                    progressLabel.post {
+                        progressLabel.text = "onProgress: $cur / $total"
+                    }
+                }
+            }
+        })
+
+        layout.addView(TextView(this).apply { text = "\nloadSquare(100) + 圆角:" })
+        layout.addView(ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(200, 200)
+            loadSquare(url, edgePx = 100) { roundedCorners(8f) }
+        })
+
+        layout.addView(TextView(this).apply { text = "\nloadWithAspectRatio 16:9, max 200px:" })
+        layout.addView(ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(200, 200)
+            loadWithAspectRatio(url, aspectWidth = 16, aspectHeight = 9, maxEdgePx = 200) {
+                roundedCorners(4f)
+            }
         })
 
         layout.addView(TextView(this).apply { text = "\nCrossfade disabled:" })

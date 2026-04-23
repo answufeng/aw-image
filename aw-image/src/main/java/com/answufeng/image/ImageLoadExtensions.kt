@@ -39,7 +39,8 @@ private fun ImageRequest.Builder.applyGlobalCrossfade() {
  *
  * @param disposable 要绑定的 Disposable
  * @param owner LifecycleOwner 实例
- * @param data 图片数据源（用于清理进度回调）
+ * @param progressToken [AwImageScope] 为 [onProgress] 生成的 token，无则 null
+ * @param onProgress 与 token 成对的回调引用，用于 [ProgressInterceptor.unregister]
  */
 private fun bindLifecycle(
     disposable: Disposable,
@@ -251,6 +252,7 @@ fun ImageView.loadCircleWithBorder(
     borderWidth: Float = 4f,
     borderColor: Int = android.graphics.Color.WHITE
 ): Disposable {
+    require(borderWidth > 0f) { "borderWidth must be > 0, got $borderWidth" }
     return loadImage(data) {
         circle()
         transform(BorderTransformation(borderWidth, borderColor, circle = true))
@@ -269,4 +271,62 @@ fun ImageView.loadCircleWithBorder(
  */
 fun ImageView.loadBlur(data: Any?, radius: Int = 15, sampling: Int = 4): Disposable {
     return loadImage(data) { transform(BlurTransformation(radius, sampling)) }
+}
+
+/**
+ * 按正方形目标像素解码，适用于头像、列表方图等（减少长边过大导致的解码内存）。
+ *
+ * 若 [config] 中再次调用 [AwImageScope.override]，以**后者**为准。
+ *
+ * @param edgePx 边长（px），必须 > 0
+ * @throws IllegalArgumentException 当 [edgePx] 非法时
+ */
+fun ImageView.loadSquare(
+    data: Any?,
+    edgePx: Int,
+    placeholderRes: Int = 0,
+    errorRes: Int = 0,
+    config: (AwImageScope.() -> Unit)? = null
+): Disposable {
+    require(edgePx > 0) { "edgePx must be > 0, got $edgePx" }
+    return loadImage(data, placeholderRes, errorRes) {
+        override(edgePx, edgePx)
+        config?.invoke(this)
+    }
+}
+
+/**
+ * 按 [aspectWidth] : [aspectHeight] 比例缩放，使较长边为 [maxEdgePx]（px），用于 16:9 封面等省内存场景。
+ *
+ * 若 [config] 中再次调用 [AwImageScope.override]，以**后者**为准。
+ *
+ * @param maxEdgePx 较长边的解码像素，必须 > 0
+ * @throws IllegalArgumentException 比例或边长非法时
+ */
+fun ImageView.loadWithAspectRatio(
+    data: Any?,
+    aspectWidth: Int,
+    aspectHeight: Int,
+    maxEdgePx: Int,
+    placeholderRes: Int = 0,
+    errorRes: Int = 0,
+    config: (AwImageScope.() -> Unit)? = null
+): Disposable {
+    require(aspectWidth > 0 && aspectHeight > 0) {
+        "aspectWidth and aspectHeight must be > 0, got ${aspectWidth}x$aspectHeight"
+    }
+    require(maxEdgePx > 0) { "maxEdgePx must be > 0, got $maxEdgePx" }
+    val w: Int
+    val h: Int
+    if (aspectWidth >= aspectHeight) {
+        w = maxEdgePx
+        h = (maxEdgePx.toLong() * aspectHeight / aspectWidth).toInt().coerceAtLeast(1)
+    } else {
+        h = maxEdgePx
+        w = (maxEdgePx.toLong() * aspectWidth / aspectHeight).toInt().coerceAtLeast(1)
+    }
+    return loadImage(data, placeholderRes, errorRes) {
+        override(w, h)
+        config?.invoke(this)
+    }
 }

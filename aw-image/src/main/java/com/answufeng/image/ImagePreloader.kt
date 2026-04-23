@@ -107,10 +107,6 @@ object ImagePreloader {
         }
     }
 
-    /** @suppress 使用 [getDrawable] 替代 */
-    @Deprecated("Use getDrawable instead", ReplaceWith("getDrawable(context, data)"))
-    suspend fun get(context: android.content.Context, data: Any): Drawable? = getDrawable(context, data)
-
     /**
      * 批量预加载图片。
      *

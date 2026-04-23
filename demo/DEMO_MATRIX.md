@@ -6,7 +6,7 @@
 |----------|------|------|
 | 网络 / 本地 / 资源 | `BasicLoadActivity` | 多数据源 |
 | 圆角 / 滤镜 / 模糊 / 灰度 | `TransformActivity` / `FilterActivity` | 变换与性能注意 |
-| 圆形 / 圆角高级 | `AdvancedConfigActivity` | DSL、`raw {}` |
+| 圆形 / 圆角高级 | `AdvancedConfigActivity` | DSL、`raw {}`、`onProgress`（`post` 更新 UI）、`loadSquare` / `loadWithAspectRatio` |
 | 占位 / 错误 | `ErrorHandlingActivity` | 失败兜底 |
 | 列表 | `RecyclerViewActivity` | 滚动与解码尺寸 |
 | 预加载 | `PreloadActivity` | 批量预加载 |

@@ -15,7 +15,13 @@ class DemoApp : Application() {
             enableSvg(true)
             placeholder(ColorDrawable(Color.parseColor("#FFE2E8F0")))
             error(ColorDrawable(Color.parseColor("#FFFEE2E2")))
-            enableLogging(true)
+            logTag("aw-image-demo")
+            enableLogging(BuildConfig.DEBUG)
         }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        AwImage.onApplicationTrimMemory(this, level)
     }
 }

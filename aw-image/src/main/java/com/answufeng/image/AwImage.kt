@@ -1,5 +1,6 @@
 package com.answufeng.image
 
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -99,6 +100,14 @@ object AwImage {
     @Volatile
     private var initialized = false
 
+    /**
+     * [init] 中 [ImageConfig.defaultRequestListener] 设置的与单次 DSL 监听器**合并**的全局回拨（先本监听器、再 per-request）。
+     * 勿在业务中直接改写；应通过 [ImageConfig.defaultRequestListener] 配置。
+     */
+    @Volatile
+    internal var globalRequestListener: ImageRequest.Listener? = null
+        private set
+
     /** 是否已调用 [init] */
     val isInitialized: Boolean get() = initialized
 
@@ -108,14 +117,15 @@ object AwImage {
      * 初始化全局 ImageLoader。
      *
      * 建议在 [Application.onCreate] 中调用。多次调用会覆盖之前的配置，
-     * 包括已设置的 ImageLoader、占位图/错误图/兜底图、全局 crossfade 等。
-     * 如果只需要修改部分配置，仍需传入完整的配置块，未设置的项将恢复为默认值。
+     * 包括已设置的 ImageLoader、占位图/错误图/兜底图、全局 crossfade、
+     * [ImageConfig.defaultRequestListener] 等。若只改部分项，也需在块内写全量意图（未调用的将恢复为默认）。
      *
      * @param context 任意 Context，内部会转为 ApplicationContext
      * @param config  可选的 DSL 配置块
      * @return 创建的 [ImageLoader] 实例，方便高级用户进一步定制
      */
     fun init(context: Context, config: (ImageConfig.() -> Unit)? = null): ImageLoader = synchronized(AwImage) {
+        AwImageLogger.resetForInit()
         val appContext = context.applicationContext
         val imageConfig = ImageConfig().apply { config?.invoke(this) }
 
@@ -184,6 +194,7 @@ object AwImage {
         globalFallbackDrawable = imageConfig.fallbackDrawable?.constantState?.newDrawable()?.mutate()
         globalCrossfadeEnabled = imageConfig.crossfadeEnabled
         globalCrossfadeDuration = imageConfig.crossfadeDuration
+        globalRequestListener = imageConfig.requestListenerForInit
 
         val imageLoader = builder.build()
         Coil.setImageLoader(imageLoader)
@@ -265,6 +276,19 @@ object AwImage {
         }.onFailure {
             AwImageLogger.e("getDiskCacheSize: failed", it)
         }.getOrDefault(0L)
+    }
+
+    /**
+     * 在 [android.app.Application.onTrimMemory] / [android.app.Activity.onTrimMemory] 中调用，
+     * 在系统回收内存时清理图片**内存**缓存。
+     *
+     * 在 `level` 为 [ComponentCallbacks2.TRIM_MEMORY_MODERATE] 及以上（后台）或
+     * [ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL]（前台极端紧张）时执行 [clearMemoryCache]。
+     */
+    fun onApplicationTrimMemory(context: Context, level: Int): Boolean {
+        val shouldClear = level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL
+        return if (shouldClear) clearMemoryCache(context) else false
     }
 
     /**
@@ -358,7 +382,6 @@ object AwImage {
      * 全局配置 DSL 类。
      *
      * 所有属性通过 setter 方法设置，外部不可直接赋值。
-     * 以下 `internal` 存根与 ktlint 约定冲突处已局部抑制，由 [init] 消费，勿在外部包访问。
      */
     @AwImageDsl
     class ImageConfig {
@@ -366,17 +389,15 @@ object AwImage {
         var memoryCachePercent: Double = 0.25
             private set
 
-        @Suppress("ktlint")
-        internal var memoryCacheMaxBytes: Long? = null
-            private set
+        private var memoryCacheMaxBytesStore: Long? = null
+        internal val memoryCacheMaxBytes: Long? get() = memoryCacheMaxBytesStore
 
         /** 磁盘缓存最大字节数 */
         var diskCacheSize: Long = 100L * 1024 * 1024
             private set
 
-        @Suppress("ktlint")
-        internal var diskCacheDir: File? = null
-            private set
+        private var diskCacheDirStore: File? = null
+        internal val diskCacheDir: File? get() = diskCacheDirStore
 
         /** 是否启用全局渐入动画 */
         var crossfadeEnabled: Boolean = true
@@ -405,43 +426,42 @@ object AwImage {
         var placeholderRes: Int = 0
             private set
 
-        @Suppress("ktlint")
-        internal var placeholderDrawable: Drawable? = null
-            private set
+        private var placeholderDrawableStore: Drawable? = null
+        internal val placeholderDrawable: Drawable? get() = placeholderDrawableStore
 
         /** 全局错误图资源 ID */
         var errorRes: Int = 0
             private set
 
-        @Suppress("ktlint")
-        internal var errorDrawable: Drawable? = null
-            private set
+        private var errorDrawableStore: Drawable? = null
+        internal val errorDrawable: Drawable? get() = errorDrawableStore
 
         /** 全局兜底图资源 ID */
         var fallbackRes: Int = 0
             private set
 
-        @Suppress("ktlint")
-        internal var fallbackDrawable: Drawable? = null
-            private set
+        private var fallbackDrawableStore: Drawable? = null
+        internal val fallbackDrawable: Drawable? get() = fallbackDrawableStore
 
-        @Suppress("ktlint")
-        internal var okHttpClient: OkHttpClient? = null
-            private set
+        private var okHttpClientStore: OkHttpClient? = null
+        internal val okHttpClient: OkHttpClient? get() = okHttpClientStore
+
+        private var requestListenerStore: ImageRequest.Listener? = null
+        internal val requestListenerForInit: ImageRequest.Listener? get() = requestListenerStore
 
         /** 按比例设置内存缓存大小（0.05~0.5） */
         fun memoryCacheSize(percent: Double) { memoryCachePercent = percent.coerceIn(0.05, 0.5) }
 
         /** 按字节数设置内存缓存大小（优先级高于 [memoryCacheSize]） */
         fun memoryCacheMaxSize(bytes: Long) {
-            memoryCacheMaxBytes = bytes.coerceAtLeast(0)
+            memoryCacheMaxBytesStore = bytes.coerceAtLeast(0)
         }
 
         /** 设置磁盘缓存最大字节数 */
         fun diskCacheSize(bytes: Long) { diskCacheSize = bytes.coerceAtLeast(0) }
 
         /** 设置磁盘缓存目录（默认 `{cacheDir}/aw_image_cache`） */
-        fun diskCacheDir(directory: File) { diskCacheDir = directory }
+        fun diskCacheDir(directory: File) { diskCacheDirStore = directory }
 
         /** 设置是否启用全局渐入动画 */
         fun crossfade(enabled: Boolean) { crossfadeEnabled = enabled }
@@ -461,28 +481,36 @@ object AwImage {
         /** 设置离线/仅缓存策略使用的联网判定是否必须 VALIDATED（默认 true） */
         fun strictNetworkForOffline(enabled: Boolean) { isStrictNetworkForOffline = enabled }
 
+        /**
+         * 与每次 [com.answufeng.image.loadImage] 的 DSL 监听器合并（**先**调用本监听器、再 per-request 回调与内部进度清理）。
+         */
+        fun defaultRequestListener(listener: ImageRequest.Listener) { requestListenerStore = listener }
+
         /** 设置全局占位图资源 ID */
         fun placeholder(res: Int) { placeholderRes = res }
 
         /** 设置全局占位图 Drawable（优先级高于资源 ID） */
-        fun placeholder(drawable: Drawable) { placeholderDrawable = drawable }
+        fun placeholder(drawable: Drawable) { placeholderDrawableStore = drawable }
 
         /** 设置全局错误图资源 ID */
         fun error(res: Int) { errorRes = res }
 
         /** 设置全局错误图 Drawable（优先级高于资源 ID） */
-        fun error(drawable: Drawable) { errorDrawable = drawable }
+        fun error(drawable: Drawable) { errorDrawableStore = drawable }
 
         /** 设置全局兜底图资源 ID（data 为 null 时显示） */
         fun fallback(res: Int) { fallbackRes = res }
 
         /** 设置全局兜底图 Drawable（data 为 null 时显示，优先级高于资源 ID） */
-        fun fallback(drawable: Drawable) { fallbackDrawable = drawable }
+        fun fallback(drawable: Drawable) { fallbackDrawableStore = drawable }
 
         /** 设置自定义 OkHttpClient（用于自定义超时、拦截器等） */
-        fun okHttpClient(client: OkHttpClient) { okHttpClient = client }
+        fun okHttpClient(client: OkHttpClient) { okHttpClientStore = client }
 
         /** 设置是否启用调试日志（默认 false） */
         fun enableLogging(enabled: Boolean) { AwImageLogger.enabled = enabled }
+
+        /** 设置 Logcat tag（默认 `aw-image`；空或纯空白则保持默认） */
+        fun logTag(name: String) { AwImageLogger.setTag(name) }
     }
 }

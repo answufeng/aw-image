@@ -169,9 +169,28 @@ class AwImageScope internal constructor(
      *
      * @param width 宽度，必须 > 0
      * @param height 高度，必须 > 0
+     * @throws IllegalArgumentException 当 [width] 或 [height] 非正时
      */
     fun override(width: Int, height: Int) {
-        if (width > 0 && height > 0) builder.size(width, height)
+        require(width > 0 && height > 0) {
+            "override width and height must be > 0, got ${width}x$height"
+        }
+        builder.size(width, height)
+    }
+
+    /**
+     * 自定义内存缓存键（与 [com.answufeng.image.AwImage.isCached]、预加载的 `size`/变换配置需一致才能命中）。
+     * 映射 [ImageRequest.Builder.memoryCacheKey]。
+     */
+    fun memoryCacheKey(key: String?) {
+        builder.memoryCacheKey(key)
+    }
+
+    /**
+     * 自定义磁盘缓存键。映射 [ImageRequest.Builder.diskCacheKey]。
+     */
+    fun diskCacheKey(key: String?) {
+        builder.diskCacheKey(key)
     }
 
     /**
@@ -400,6 +419,9 @@ class AwImageScope internal constructor(
     /**
      * 设置下载进度回调。
      *
+     * 回调可能在 **非主线程** 执行（OkHttp 读流线程）；更新 UI 时请 `view.post { }` 或切主线程。
+     * 仅 **http(s) 字符串** data 且经本库 [ProgressInterceptor] 时有效。
+     *
      * @param action 回调参数为 (currentBytes, totalBytes)，totalBytes 为 -1 时表示未知
      */
     fun onProgress(action: (currentBytes: Long, totalBytes: Long) -> Unit) {
@@ -433,27 +455,32 @@ class AwImageScope internal constructor(
         val hasSuccess = onSuccessCallback != null
         val hasError = onErrorCallback != null
         val hasProgress = onProgressCallback != null
-        if (hasStart || hasSuccess || hasError || hasProgress) {
+        val globalListener = AwImage.globalRequestListener
+        if (hasStart || hasSuccess || hasError || hasProgress || globalListener != null) {
             val tokenSnapshot = progressToken
             val progressCb = onProgressCallback
             builder.listener(
-                onStart = {
+                onStart = { request ->
+                    globalListener?.onStart(request)
                     AwImageLogger.d("loadImage: onStart")
                     onStartCallback?.invoke()
                 },
-                onCancel = { _ ->
+                onCancel = { request ->
+                    globalListener?.onCancel(request)
                     if (tokenSnapshot != null && progressCb != null) {
                         ProgressInterceptor.unregister(tokenSnapshot, progressCb)
                     }
                 },
-                onError = { _, result ->
+                onError = { request, result ->
+                    globalListener?.onError(request, result)
                     AwImageLogger.e("loadImage: onError - ${result.throwable.message}")
                     if (tokenSnapshot != null && progressCb != null) {
                         ProgressInterceptor.unregister(tokenSnapshot, progressCb)
                     }
                     onErrorCallback?.invoke(result)
                 },
-                onSuccess = { _, result ->
+                onSuccess = { request, result ->
+                    globalListener?.onSuccess(request, result)
                     AwImageLogger.d("loadImage: onSuccess")
                     if (tokenSnapshot != null && progressCb != null) {
                         ProgressInterceptor.unregister(tokenSnapshot, progressCb)
