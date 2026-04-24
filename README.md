@@ -2,7 +2,9 @@
 
 [![JitPack](https://jitpack.io/v/answufeng/aw-image.svg)](https://jitpack.io/#answufeng/aw-image)
 
-**一句话**：在 Android 上封装 **Coil 2.7**，用 Kotlin **DSL** 给 **`ImageView`（XML / View 体系）** 用；不挡 Coil 自带能力。进度、缓存键与 [R8 consumer 规则](aw-image/consumer-rules.pro) 已备。**Compose** 请用官方 `coil-compose`，本库不包一层。
+基于 **Coil 2.7** 的 Android 图片加载基础库：面向 **View/XML 的 `ImageView`**，提供更顺手的 Kotlin **DSL**、常用预设、预加载、缓存与进度回调等能力；同时保留 Coil 原生可扩展性（可用 `raw { }` 直配 `ImageRequest.Builder`）。
+
+如果你只想最快接入并跑通第一张图，直接看下面的「5 分钟上手」即可；其它内容都可以后置按需查阅。
 
 | | |
 |:--|:--|
@@ -10,57 +12,39 @@
 | **范围** | minSdk **24**；本仓库用 compileSdk 35、**JDK 17** 跑 CI / demo |
 | **示例** | 见 [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
 
-**目录**：[安装](#安装) · [快速上手](#快速上手) · [易踩坑](#易踩坑) · [能做什么](#能做什么) · [进阶](#进阶) · [工程与平台](#工程与平台) · [常见问题](#常见问题) · [发版与维护](#发版与维护) · [许可证](#许可证)
-
 ---
 
-## 安装
+## 5 分钟上手（最小接入）
 
-1. 在 [JitPack](https://jitpack.io/#answufeng/aw-image) 使用的 `repositories` 里加上 `https://jitpack.io`。  
-2. 对 module 下依赖（版本号与 **Git 标签**一致）：
+### 1) 添加依赖（JitPack）
 
 ```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri("https://jitpack.io") }
+        google()
+        mavenCentral()
+    }
+}
+
+// app/build.gradle.kts
 dependencies {
     implementation("com.github.answufeng:aw-image:1.0.0")
 }
 ```
 
-**说明**
+`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.0`）。
 
-- 本库对 Coil / `coil-gif` / OkHttp 使用 `api`，多数项目**不必**再写 `implementation(coil)`。多模块冲突时请在宿主**统一** `coil` / `okhttp` / `okio` 版本。  
-- **Release** 请在混淆包上点一遍图片与列表；AAR 已含 consumer 规则。  
-
-**本库随带的传递版本（供对齐依赖时参考）**
-
-| 组件 | 版本 |
-|------|------|
-| Coil、coil-gif、coil-svg | 2.7.0 |
-| OkHttp | 4.12.0 |
-| kotlinx-coroutines | 1.9.0 |
-
----
-
-## 快速上手
-
-> 不调用 `AwImage.init` 也可以加载；全局配置是可选的。
-
-**加载一张图**
+### 2) 加载第一张图
 
 ```kotlin
 imageView.loadImage("https://example.com/photo.jpg")
 ```
 
-**常用扩展**
+### 3) （可选）全局初始化
 
-```kotlin
-imageView.loadCircle(avatarUrl)
-imageView.loadRounded(url, 24f)                    // 或 loadRoundedDp(url, 8f)
-imageView.loadSquare(url, edgePx = 200) { roundedCorners(8f) }
-imageView.loadWithAspectRatio(url, 16, 9, maxEdgePx = 400)
-imageView.loadImage(url, config = AwImagePresets.listThumbnail(200))
-```
-
-**全局初始化**（建议只在 `Application` 做一次；每次执行会先关日志、把 Logcat tag 设回 `aw-image`，再跑块内配置）
+不调用 `AwImage.init` 也能加载；需要统一占位图/缓存/日志等时再配。
 
 ```kotlin
 AwImage.init(this) {
@@ -74,9 +58,93 @@ AwImage.init(this) {
 // 低内存时可在 onTrimMemory 中：AwImage.onApplicationTrimMemory(this, level)
 ```
 
+<details>
+<summary><b>依赖与传递版本说明（点击展开）</b></summary>
+
+- 本库对 Coil / `coil-gif` / OkHttp 使用 `api`，多数项目**不必**再写 `implementation(coil)`。
+- 多模块冲突时请在宿主**统一** `coil` / `okhttp` / `okio` 版本。
+- **Release** 请在混淆包上点一遍图片与列表；AAR 已含 consumer 规则。
+
+| 组件 | 版本 |
+|------|------|
+| Coil、coil-gif、coil-svg | 2.7.0 |
+| OkHttp | 4.12.0 |
+| kotlinx-coroutines | 1.9.0 |
+
+</details>
+
 ---
 
-## 易踩坑
+## 目录（按常见需求跳转）
+
+| 想做什么 | 跳转到 |
+|----------|--------|
+| 最短时间跑通依赖与加载 | [5 分钟上手（最小接入）](#5-分钟上手最小接入) · [环境要求](#环境要求) |
+| 常用 API / DSL / 预加载 | [API 速查](#api-速查) |
+| 别踩雷（列表、尺寸、进度回调等） | [易踩坑](#易踩坑强烈建议先看) |
+| 能力列表（缓存、变换、预设等） | [能做什么](#能做什么概览) |
+| 更深的规则与高级用法 | [进阶](#进阶) |
+| Java / R8 / CI 等工程信息 | [工程与平台](#工程与平台) · [发版与维护](#发版与维护) |
+| 常见问题 | [常见问题](#常见问题) |
+
+---
+
+## 环境要求
+
+| 项目 | 最低版本 |
+|------|----------|
+| Android minSdk | 24 |
+| 本仓库 compileSdk（验证用） | 35 |
+| JDK（仅本仓库 / demo） | 17 |
+| Coil（库内对齐） | 2.7.x |
+
+> 接入 AAR 只要你的项目能正常使用 Android / Kotlin 即可；JDK 17 主要是为了能编译本仓库工程（AGP 8.x 的要求）。
+
+---
+
+## API 速查
+
+### 常用扩展
+
+```kotlin
+imageView.loadCircle(avatarUrl)
+imageView.loadRounded(url, 24f)                    // 或 loadRoundedDp(url, 8f)
+imageView.loadSquare(url, edgePx = 200) { roundedCorners(8f) }
+imageView.loadWithAspectRatio(url, 16, 9, maxEdgePx = 400)
+imageView.loadImage(url, config = AwImagePresets.listThumbnail(200))
+```
+
+### DSL 一眼能抄的例子
+
+```kotlin
+imageView.loadImage(url) {
+    placeholder(R.drawable.loading)
+    error(R.drawable.fail)
+    roundedCorners(12f)
+    crossfade(300)
+    // 列表场景建议明确解码尺寸（示例值按需改）
+    override(200, 200)
+    onError { /* ... */ }
+}
+```
+
+### 预加载 / 读缓存 / 清缓存
+
+```kotlin
+lifecycleScope.launch {
+    ImagePreloader.preload(context, url) { size(200, 200) }
+    ImagePreloader.preloadAll(context, urls, concurrency = 8) { size(200, 200) }
+    ImagePreloader.getDrawable(context, url) { size(200, 200) }
+}
+
+AwImage.clearMemoryCache(context)
+AwImage.clearDiskCache(context)
+AwImage.isCached(context, url) { size(200, 200) }
+```
+
+---
+
+## 易踩坑（强烈建议先看）
 
 | 情况 | 建议 |
 |------|------|
@@ -86,7 +154,7 @@ AwImage.init(this) {
 
 ---
 
-## 能做什么
+## 能做什么（概览）
 
 | 类别 | 说明 |
 |------|------|
