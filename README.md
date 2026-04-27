@@ -8,7 +8,7 @@
 
 | | |
 |:--|:--|
-| **当前版本** | `1.0.2`（[Git 标签](https://github.com/answufeng/aw-image/tags) / JitPack 同名） |
+| **当前版本** | `1.0.3`（[Git 标签](https://github.com/answufeng/aw-image/tags) / JitPack 同名） |
 | **范围** | minSdk **24**；本仓库用 compileSdk 35、**JDK 17** 跑 CI / demo |
 | **示例** | 见 [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
 
@@ -30,11 +30,11 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.answufeng:aw-image:1.0.2")
+    implementation("com.github.answufeng:aw-image:1.0.3")
 }
 ```
 
-`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.2`）。
+`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.3`）。
 
 ### 2) 加载第一张图
 
@@ -305,4 +305,4 @@ AwImage.isCached(context, url) { size(200, 200) }
 
 ## 许可证
 
-[Apache-2.0](LICENSE) · 文档与 **`1.0.2`** 同步
+[Apache-2.0](LICENSE) · 文档与 **`1.0.3`** 同步
