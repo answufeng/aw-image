@@ -8,7 +8,7 @@
 
 | | |
 |:--|:--|
-| **当前版本** | `1.0.0`（[Git 标签](https://github.com/answufeng/aw-image/tags) / JitPack 同名） |
+| **当前版本** | `1.0.2`（[Git 标签](https://github.com/answufeng/aw-image/tags) / JitPack 同名） |
 | **范围** | minSdk **24**；本仓库用 compileSdk 35、**JDK 17** 跑 CI / demo |
 | **示例** | 见 [demo/DEMO_MATRIX.md](demo/DEMO_MATRIX.md) |
 
@@ -30,11 +30,11 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.answufeng:aw-image:1.0.0")
+    implementation("com.github.answufeng:aw-image:1.0.2")
 }
 ```
 
-`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.0`）。
+`implementation` 中的 **版本号与 Git / JitPack 的 tag 一致**（上例为 `1.0.2`）。
 
 ### 2) 加载第一张图
 
@@ -295,14 +295,14 @@ AwImage.isCached(context, url) { size(200, 200) }
 
 **本库在 JitPack 发新版的常规步骤**
 
-1. [gradle.properties](gradle.properties) 里 `VERSION_NAME` 与 **Git 标签**一致。  
-2. `git tag <x.y.z> && git push origin <x.y.z>`。  
-3. 打开 [JitPack](https://jitpack.io/#answufeng/aw-image) 对应该标签 **Build / Get**。
+1. `git tag <x.y.z> && git push origin <x.y.z>`。  
+2. 打开 [JitPack](https://jitpack.io/#answufeng/aw-image) 对应该标签 **Build / Get**。  
+3. 依赖使用 `com.github.answufeng:aw-image:<标签>`。
 
-依赖形式：`com.github.answufeng:aw-image:<标签>`
+> 说明：JitPack 构建时会通过 `-Pversion=<tag>` 传入版本；仓库内的 `VERSION_NAME` 主要用于本地/传统发布流程，可选。
 
 ---
 
 ## 许可证
 
-[Apache-2.0](LICENSE) · 文档与 **`1.0.0`** 同步
+[Apache-2.0](LICENSE) · 文档与 **`1.0.2`** 同步
