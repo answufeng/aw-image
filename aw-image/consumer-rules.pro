@@ -90,9 +90,9 @@
 # ===========================================================
 
 -keepclassmembers class com.answufeng.image.ImagePreloader {
-    public suspend *** preload(...);
-    public suspend *** getDrawable(...);
-    public suspend *** preloadAll(...);
+    public *** preload(...);
+    public *** getDrawable(...);
+    public *** preloadAll(...);
 }
 
 # ===========================================================
