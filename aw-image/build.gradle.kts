@@ -50,7 +50,7 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.appcompat)
     implementation(libs.annotation)
-    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.lifecycle.runtime)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
 }
