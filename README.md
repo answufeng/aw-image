@@ -125,6 +125,10 @@ imageView.loadImage(url) {
     // 列表场景建议明确解码尺寸（示例值按需改）
     override(200, 200)
     onError { /* ... */ }
+    // 失败后自动重试（最多 2 次）
+    retry(2)
+    // 网络恢复后自动重试
+    retryOnNetworkReconnect()
 }
 ```
 

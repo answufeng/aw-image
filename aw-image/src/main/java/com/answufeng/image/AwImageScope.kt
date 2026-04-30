@@ -74,7 +74,17 @@ class AwImageScope internal constructor(
     private var onStartCallback: (() -> Unit)? = null
     private var onSuccessCallback: ((coil.request.SuccessResult) -> Unit)? = null
     private var onErrorCallback: ((coil.request.ErrorResult) -> Unit)? = null
+
+    internal fun setRetryOnError(retryOnError: ((coil.request.ErrorResult) -> Unit)?) {
+        onErrorCallback = retryOnError
+    }
     internal var onProgressCallback: ((Long, Long) -> Unit)? = null
+        private set
+
+    internal var retryCount: Int = 0
+        private set
+
+    internal var retryOnNetworkReconnect: Boolean = false
         private set
 
     /**
@@ -426,6 +436,15 @@ class AwImageScope internal constructor(
      */
     fun onProgress(action: (currentBytes: Long, totalBytes: Long) -> Unit) {
         onProgressCallback = action
+    }
+
+    fun retry(count: Int) {
+        require(count >= 0) { "retryCount must be >= 0, got $count" }
+        retryCount = count
+    }
+
+    fun retryOnNetworkReconnect(enabled: Boolean = true) {
+        retryOnNetworkReconnect = enabled
     }
 
     internal fun applyTo(context: android.content.Context) {

@@ -169,6 +169,45 @@ fun ImageView.loadImage(
             if (!scope.isCrossfadeExplicitlySet) {
                 applyGlobalCrossfade()
             }
+
+            if (scope.retryCount > 0 || scope.retryOnNetworkReconnect) {
+                val iv = this@loadImage
+                val capturedData = data
+                val capturedPhRes = placeholderRes
+                val capturedErrRes = errorRes
+                val capturedConfig = config
+                val remaining = scope.retryCount
+                val retryOnReconnect = scope.retryOnNetworkReconnect
+                scope.setRetryOnError { result ->
+                    if (remaining > 0) {
+                        AwImageLogger.d("loadImage: retrying ($remaining remaining) for $capturedData")
+                        iv.post {
+                            iv.loadImage(capturedData, capturedPhRes, capturedErrRes) {
+                                retry(remaining - 1)
+                                if (retryOnReconnect) retryOnNetworkReconnect()
+                                capturedConfig(this)
+                            }
+                        }
+                    } else if (retryOnReconnect) {
+                        val networkCallback: (Boolean) -> Unit = object : (Boolean) -> Unit {
+                            override fun invoke(connected: Boolean) {
+                                if (connected) {
+                                    ImageNetworkMonitor.removeOnConnectivityChangedListener(this)
+                                    iv.post {
+                                        iv.loadImage(capturedData, capturedPhRes, capturedErrRes) {
+                                            retry(0)
+                                            retryOnNetworkReconnect()
+                                            capturedConfig(this)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        ImageNetworkMonitor.addOnConnectivityChangedListener(networkCallback)
+                    }
+                }
+            }
+
             scope.registerProgressIfNeeded()
             scope.applyTo(context)
             tagValue = scope.tagValue

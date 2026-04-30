@@ -23,10 +23,6 @@ import android.net.NetworkCapabilities
  */
 internal object ImageNetworkMonitor {
 
-    /**
-     * 为 true（默认）时，[isConnected] 要求 [NetworkCapabilities.NET_CAPABILITY_VALIDATED]；
-     * 为 false 时仅要求 [NetworkCapabilities.NET_CAPABILITY_INTERNET]。
-     */
     @Volatile
     internal var isStrictNetworkForOffline: Boolean = true
 
@@ -35,6 +31,17 @@ internal object ImageNetworkMonitor {
 
     @Volatile
     private var registered = false
+
+    private val connectivityListeners =
+        java.util.concurrent.CopyOnWriteArrayList<(Boolean) -> Unit>()
+
+    fun addOnConnectivityChangedListener(listener: (Boolean) -> Unit) {
+        connectivityListeners.add(listener)
+    }
+
+    fun removeOnConnectivityChangedListener(listener: (Boolean) -> Unit) {
+        connectivityListeners.remove(listener)
+    }
 
     private fun hasUsableInternet(caps: NetworkCapabilities): Boolean {
         if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
@@ -67,17 +74,24 @@ internal object ImageNetworkMonitor {
             cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     val caps = cm.getNetworkCapabilities(network)
-                    connected = caps != null && hasUsableInternet(caps)
+                    val nowConnected = caps != null && hasUsableInternet(caps)
+                    connected = nowConnected
+                    if (nowConnected) {
+                        for (l in connectivityListeners) l.invoke(true)
+                    }
                 }
 
                 override fun onLost(network: Network) {
                     connected = false
+                    for (l in connectivityListeners) l.invoke(false)
                 }
 
                 override fun onCapabilitiesChanged(
                     network: Network, caps: NetworkCapabilities
                 ) {
-                    connected = hasUsableInternet(caps)
+                    val nowConnected = hasUsableInternet(caps)
+                    connected = nowConnected
+                    for (l in connectivityListeners) l.invoke(nowConnected)
                 }
             })
             registered = true

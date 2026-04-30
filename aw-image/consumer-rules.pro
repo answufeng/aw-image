@@ -74,6 +74,8 @@
     public *** onSuccess(...);
     public *** onError(...);
     public *** onProgress(...);
+    public *** retry(...);
+    public *** retryOnNetworkReconnect(...);
     public *** raw(...);
     public *** addHeader(...);
     public *** setHeader(...);
