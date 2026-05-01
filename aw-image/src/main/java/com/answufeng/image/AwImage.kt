@@ -4,6 +4,7 @@ import android.content.ComponentCallbacks2
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.util.Log
 import coil.Coil
 import coil.ImageLoader
 import coil.decode.GifDecoder
@@ -144,6 +145,12 @@ object AwImage {
             val memBuilder = MemoryCache.Builder(appContext)
             val maxBytes = imageConfig.memoryCacheMaxBytes
             if (maxBytes != null) {
+                if (maxBytes > Int.MAX_VALUE.toLong()) {
+                    Log.w(
+                        "AwImage",
+                        "memoryCacheMaxSize exceeds Int.MAX_VALUE bytes; capping to Int.MAX_VALUE for Coil MemoryCache"
+                    )
+                }
                 memBuilder.maxSizeBytes(maxBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
             } else {
                 memBuilder.maxSizePercent(imageConfig.memoryCachePercent)

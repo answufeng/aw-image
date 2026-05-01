@@ -76,7 +76,15 @@ class AwImageScope internal constructor(
     private var onErrorCallback: ((coil.request.ErrorResult) -> Unit)? = null
 
     internal fun setRetryOnError(retryOnError: ((coil.request.ErrorResult) -> Unit)?) {
-        onErrorCallback = retryOnError
+        if (retryOnError == null) {
+            onErrorCallback = null
+            return
+        }
+        val previous = onErrorCallback
+        onErrorCallback = { result ->
+            previous?.invoke(result)
+            retryOnError(result)
+        }
     }
     internal var onProgressCallback: ((Long, Long) -> Unit)? = null
         private set

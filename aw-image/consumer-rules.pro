@@ -135,8 +135,11 @@
 # 扩展函数（Kotlin 编译为静态方法）
 # ===========================================================
 
+-keep class com.answufeng.image.AwImageLogger { *; }
+
 -keepclassmembers class com.answufeng.image.ImageLoadExtensionsKt {
     public static *** loadImage(...);
+    public static *** emptyImageLoadDisposable(...);
     public static *** loadCircle(...);
     public static *** loadRounded(...);
     public static *** loadRoundedDp(...);

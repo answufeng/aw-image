@@ -48,10 +48,9 @@ internal object ProgressInterceptor : Interceptor {
      * Safe to call with a [listener] that was never registered.
      */
     fun unregister(token: String, listener: (Long, Long) -> Unit) {
-        val list = listeners[token] ?: return
-        list.remove(listener)
-        if (list.isEmpty()) {
-            listeners.remove(token)
+        listeners.computeIfPresent(token) { _, list ->
+            list.remove(listener)
+            if (list.isEmpty()) null else list
         }
     }
 
@@ -64,7 +63,9 @@ internal object ProgressInterceptor : Interceptor {
             request
         }
         val response = chain.proceed(forwardRequest)
-        val callbackList = token?.let { listeners[it] }
+        val callbackList = token?.let { tok ->
+            listeners[tok]?.let { ArrayList(it) }
+        }
         if (callbackList != null && callbackList.isNotEmpty()) {
             val body = response.body ?: return response
             val contentLength = body.contentLength()

@@ -15,6 +15,7 @@ import coil.request.ImageRequest
  *
  * 当 data 为 null 时直接返回，避免触发 Coil 请求。
  */
+/** Coil 2.x [Disposable.job] 为 [kotlinx.coroutines.Deferred]；须已结束以便 [bindLifecycle] 的 invokeOnCompletion 移除 observer。 */
 private val EMPTY_DISPOSABLE = object : Disposable {
     override val isDisposed get() = true
     override val job = kotlinx.coroutines.CompletableDeferred<coil.request.ImageResult>().apply {
@@ -47,8 +48,10 @@ private fun bindLifecycle(
     owner: LifecycleOwner,
     progressToken: String? = null,
     onProgress: ((Long, Long) -> Unit)? = null,
+    onDestroy: (() -> Unit)? = null,
 ) {
     if (owner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
+        onDestroy?.invoke()
         if (!disposable.isDisposed) disposable.dispose()
         if (progressToken != null && onProgress != null) {
             ProgressInterceptor.unregister(progressToken, onProgress)
@@ -57,6 +60,7 @@ private fun bindLifecycle(
     }
     val observer = LifecycleEventObserver { _, event ->
         if (event == Lifecycle.Event.ON_DESTROY) {
+            onDestroy?.invoke()
             if (!disposable.isDisposed) disposable.dispose()
             if (progressToken != null && onProgress != null) {
                 ProgressInterceptor.unregister(progressToken, onProgress)
@@ -89,6 +93,11 @@ private fun resolveFallback(imageView: ImageView, scope: AwImageScope?) {
         else -> imageView.setImageResource(0)
     }
 }
+
+/**
+ * 与 [loadImage] 在 `data == null` 时返回的占位 [Disposable] 相同，便于统一 dispose 或单测。
+ */
+fun emptyImageLoadDisposable(): Disposable = EMPTY_DISPOSABLE
 
 /**
  * 加载图片到 [ImageView]。
@@ -145,6 +154,8 @@ fun ImageView.loadImage(
     var lifecycleOwner: LifecycleOwner? = null
     var onProgress: ((Long, Long) -> Unit)? = null
     var progressToken: String? = null
+    /** 在请求仍挂着「联网重试」监听时，随 Lifecycle 一并移除。 */
+    var networkReconnectCleanup: (() -> Unit)? = null
 
     val disposable = load(data) {
         val phDrawable = AwImage.globalPlaceholderDrawable
@@ -178,6 +189,14 @@ fun ImageView.loadImage(
                 val capturedConfig = config
                 val remaining = scope.retryCount
                 val retryOnReconnect = scope.retryOnNetworkReconnect
+                val reconnectListenerRef = arrayOfNulls<(Boolean) -> Unit>(1)
+                if (scope.retryOnNetworkReconnect) {
+                    networkReconnectCleanup = {
+                        reconnectListenerRef[0]?.let {
+                            ImageNetworkMonitor.removeOnConnectivityChangedListener(it)
+                        }
+                    }
+                }
                 scope.setRetryOnError { result ->
                     if (remaining > 0) {
                         AwImageLogger.d("loadImage: retrying ($remaining remaining) for $capturedData")
@@ -203,6 +222,7 @@ fun ImageView.loadImage(
                                 }
                             }
                         }
+                        reconnectListenerRef[0] = networkCallback
                         ImageNetworkMonitor.addOnConnectivityChangedListener(networkCallback)
                     }
                 }
@@ -220,7 +240,13 @@ fun ImageView.loadImage(
     }
 
     lifecycleOwner?.let { owner ->
-        bindLifecycle(disposable, owner, progressToken, onProgress)
+        bindLifecycle(
+            disposable,
+            owner,
+            progressToken,
+            onProgress,
+            onDestroy = networkReconnectCleanup,
+        )
     }
 
     if (tagValue != null) {

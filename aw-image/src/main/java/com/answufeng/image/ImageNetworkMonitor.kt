@@ -16,8 +16,8 @@ import android.net.NetworkCapabilities
  * - `isConnected` 可在任意线程调用（仅读取 `@Volatile` 变量）
  * - `ensureRegistered` 使用 double-checked locking 确保单次注册
  *
- * 生命周期：回调通过 `registerDefaultNetworkCallback` 注册，
- * 随 ApplicationContext 生命周期存在，不会泄漏。
+ * 生命周期：回调随 Application 进程存活；若使用 [com.answufeng.image.loadImage] 的「联网重试」，
+ * 会在绑定 [androidx.lifecycle.LifecycleOwner] 时在 `ON_DESTROY` 移除对应监听，避免 Activity 泄漏。
  *
  * 首次调用 [isConnected] 时自动注册回调，后续调用直接读取缓存值。
  */
