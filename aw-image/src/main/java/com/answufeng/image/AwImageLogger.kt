@@ -23,6 +23,7 @@ object AwImageLogger {
         }
 
     /** 与 [com.answufeng.image.AwImage.ImageConfig.logTag] 使用 */
+    @JvmName("setTagValue")
     fun setTag(name: String) {
         val n = name.trim()
         if (n.isNotEmpty()) tag = n
