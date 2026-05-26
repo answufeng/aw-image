@@ -27,10 +27,15 @@ import kotlin.math.min
  */
 class GrayscaleTransformation : Transformation {
     override val cacheKey = "aw_grayscale"
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
-        val paint = Paint().apply {
-            colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
-        }
+
+    override suspend fun transform(
+        input: Bitmap,
+        size: Size,
+    ): Bitmap {
+        val paint =
+            Paint().apply {
+                colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+            }
         val config = input.config ?: Bitmap.Config.ARGB_8888
         val output = Bitmap.createBitmap(input.width, input.height, config)
         Canvas(output).drawBitmap(input, 0f, 0f, paint)
@@ -51,7 +56,11 @@ class GrayscaleTransformation : Transformation {
  */
 class ColorFilterTransformation(private val color: Int) : Transformation {
     override val cacheKey = "aw_color_filter_${Integer.toHexString(color)}"
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+
+    override suspend fun transform(
+        input: Bitmap,
+        size: Size,
+    ): Bitmap {
         val config = input.config ?: Bitmap.Config.ARGB_8888
         val output = Bitmap.createBitmap(input.width, input.height, config)
         val canvas = Canvas(output)
@@ -83,31 +92,36 @@ class ColorFilterTransformation(private val color: Int) : Transformation {
 class BorderTransformation(
     private val borderWidth: Float,
     private val borderColor: Int,
-    private val circle: Boolean = false
+    private val circle: Boolean = false,
 ) : Transformation {
-
     init {
         require(borderWidth > 0f) { "borderWidth must be > 0, got $borderWidth" }
     }
 
     override val cacheKey = "aw_border_${borderWidth}_${Integer.toHexString(borderColor)}_$circle"
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+
+    override suspend fun transform(
+        input: Bitmap,
+        size: Size,
+    ): Bitmap {
         val config = input.config ?: Bitmap.Config.ARGB_8888
         val output = Bitmap.createBitmap(input.width, input.height, config)
         val canvas = Canvas(output)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = borderColor
-            style = Paint.Style.STROKE
-            strokeWidth = borderWidth
-        }
+        val paint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = borderColor
+                style = Paint.Style.STROKE
+                strokeWidth = borderWidth
+            }
         if (circle) {
             val cx = input.width / 2f
             val cy = input.height / 2f
             val maxRadius = minOf(input.width, input.height) / 2f
             val radius = (maxRadius - borderWidth / 2f).coerceAtLeast(0f)
-            val clipPath = Path().apply {
-                addCircle(cx, cy, maxRadius, Path.Direction.CW)
-            }
+            val clipPath =
+                Path().apply {
+                    addCircle(cx, cy, maxRadius, Path.Direction.CW)
+                }
             canvas.clipPath(clipPath)
             canvas.drawBitmap(input, 0f, 0f, null)
             if (radius > 0f) {
@@ -146,9 +160,8 @@ class BorderTransformation(
  */
 class BlurTransformation(
     private val radius: Int = 15,
-    private val sampling: Int = 4
+    private val sampling: Int = 4,
 ) : Transformation {
-
     init {
         require(radius in 1..25) { "blur radius must be in 1..25, got $radius" }
         require(sampling >= 1) { "sampling must be >= 1, got $sampling" }
@@ -156,33 +169,52 @@ class BlurTransformation(
 
     override val cacheKey = "aw_blur_${radius}_$sampling"
 
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+    override suspend fun transform(
+        input: Bitmap,
+        size: Size,
+    ): Bitmap {
         if (input.width <= 0 || input.height <= 0) return input
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val result = withContext(Dispatchers.Main) {
-                RenderEffectBlur.apply(input, radius)
+        val working =
+            if (sampling > 1) {
+                val sw = (input.width / sampling).coerceAtLeast(1)
+                val sh = (input.height / sampling).coerceAtLeast(1)
+                Bitmap.createScaledBitmap(input, sw, sh, true)
+            } else {
+                input
             }
-            if (result != null) return result
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val result =
+                withContext(Dispatchers.Main) {
+                    RenderEffectBlur.apply(working, radius)
+                }
+            if (result != null) {
+                return scaleToOriginalIfNeeded(result, input, working)
+            }
         }
 
-        return applyStackBlur(input)
+        val blurred = applyStackBlur(working)
+        return scaleToOriginalIfNeeded(blurred, input, working)
     }
 
-    private fun applyStackBlur(input: Bitmap): Bitmap {
-        val scaledWidth = (input.width / sampling).coerceAtLeast(1)
-        val scaledHeight = (input.height / sampling).coerceAtLeast(1)
-
-        val scaledBitmap = Bitmap.createScaledBitmap(input, scaledWidth, scaledHeight, true)
-
-        val blurred = StackBlur.blur(scaledBitmap, radius)
-        if (scaledBitmap !== input) scaledBitmap.recycle()
-
-        if (blurred.width == input.width && blurred.height == input.height) return blurred
-        val output = Bitmap.createScaledBitmap(blurred, input.width, input.height, true)
-        if (output !== blurred) blurred.recycle()
-        return output
+    private fun scaleToOriginalIfNeeded(
+        output: Bitmap,
+        original: Bitmap,
+        working: Bitmap,
+    ): Bitmap {
+        if (working !== original && working !== output) {
+            working.recycle()
+        }
+        if (output.width == original.width && output.height == original.height) {
+            return output
+        }
+        val scaled = Bitmap.createScaledBitmap(output, original.width, original.height, true)
+        if (scaled !== output) output.recycle()
+        return scaled
     }
+
+    private fun applyStackBlur(input: Bitmap): Bitmap = StackBlur.blur(input, radius)
 }
 
 /**
@@ -203,10 +235,14 @@ class CropTransformation(
     private val x: Int = 0,
     private val y: Int = 0,
     private val width: Int = 0,
-    private val height: Int = 0
+    private val height: Int = 0,
 ) : Transformation {
-    override val cacheKey = "aw_crop_${x}_${y}_${width}_${height}"
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+    override val cacheKey = "aw_crop_${x}_${y}_${width}_$height"
+
+    override suspend fun transform(
+        input: Bitmap,
+        size: Size,
+    ): Bitmap {
         val cropX = x.coerceIn(0, input.width)
         val cropY = y.coerceIn(0, input.height)
         val cropW = if (width <= 0) input.width - cropX else minOf(width, input.width - cropX)
@@ -235,17 +271,23 @@ class WatermarkTransformation(
     private val watermark: Bitmap,
     private val x: Int = 0,
     private val y: Int = 0,
-    private val alpha: Int = 128
+    private val alpha: Int = 128,
 ) : Transformation {
-    override val cacheKey = "aw_watermark_${watermark.generationId}_${x}_${y}_${alpha}"
-    override suspend fun transform(input: Bitmap, size: Size): Bitmap {
+    override val cacheKey =
+        "aw_watermark_${watermark.width}x${watermark.height}_${x}_${y}_${alpha.coerceIn(0, 255)}"
+
+    override suspend fun transform(
+        input: Bitmap,
+        size: Size,
+    ): Bitmap {
         val config = input.config ?: Bitmap.Config.ARGB_8888
         val output = Bitmap.createBitmap(input.width, input.height, config)
         val canvas = Canvas(output)
         canvas.drawBitmap(input, 0f, 0f, null)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.alpha = alpha.coerceIn(0, 255)
-        }
+        val paint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.alpha = alpha.coerceIn(0, 255)
+            }
         canvas.drawBitmap(watermark, x.toFloat(), y.toFloat(), paint)
         return output
     }
@@ -261,13 +303,18 @@ class WatermarkTransformation(
  * 线程约束：须在主线程执行（由 [BlurTransformation] 通过 [withContext] 调度）。
  */
 internal object RenderEffectBlur {
-
-    fun apply(input: Bitmap, radius: Int): Bitmap? {
+    fun apply(
+        input: Bitmap,
+        radius: Int,
+    ): Bitmap? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return null
         return runCatching {
-            val blurEffect = RenderEffect.createBlurEffect(
-                radius.toFloat(), radius.toFloat(), Shader.TileMode.CLAMP
-            )
+            val blurEffect =
+                RenderEffect.createBlurEffect(
+                    radius.toFloat(),
+                    radius.toFloat(),
+                    Shader.TileMode.CLAMP,
+                )
             val config = input.config ?: Bitmap.Config.ARGB_8888
             val output = Bitmap.createBitmap(input.width, input.height, config)
             val canvas = Canvas(output)
@@ -298,10 +345,10 @@ internal object RenderEffectBlur {
  * 线程约束：此对象的方法可在任意线程调用（纯 Bitmap 操作）。
  */
 internal object StackBlur {
-
-    private val bufferHolder = object : ThreadLocal<IntArray>() {
-        override fun initialValue(): IntArray = IntArray(0)
-    }
+    private val bufferHolder =
+        object : ThreadLocal<IntArray>() {
+            override fun initialValue(): IntArray = IntArray(0)
+        }
 
     private fun getBuffer(minSize: Int): IntArray {
         val buf = bufferHolder.get() ?: IntArray(0)
@@ -311,7 +358,10 @@ internal object StackBlur {
         return newBuf
     }
 
-    fun blur(bitmap: Bitmap, radius: Int): Bitmap {
+    fun blur(
+        bitmap: Bitmap,
+        radius: Int,
+    ): Bitmap {
         val w = bitmap.width
         val h = bitmap.height
         if (w <= 0 || h <= 0) return bitmap
@@ -337,15 +387,29 @@ internal object StackBlur {
     }
 
     private fun horizontalPass(
-        pixels: IntArray, vMin: IntArray, w: Int, h: Int,
-        radius: Int, div: Int, divSumSq: Int,
+        pixels: IntArray,
+        vMin: IntArray,
+        w: Int,
+        h: Int,
+        radius: Int,
+        div: Int,
+        divSumSq: Int,
     ) {
         val stack = Array(div) { IntArray(4) }
 
         for (y in 0 until h) {
-            var sumR = 0; var sumG = 0; var sumB = 0; var sumA = 0
-            var inSumR = 0; var inSumG = 0; var inSumB = 0; var inSumA = 0
-            var outSumR = 0; var outSumG = 0; var outSumB = 0; var outSumA = 0
+            var sumR = 0
+            var sumG = 0
+            var sumB = 0
+            var sumA = 0
+            var inSumR = 0
+            var inSumG = 0
+            var inSumB = 0
+            var inSumA = 0
+            var outSumR = 0
+            var outSumG = 0
+            var outSumB = 0
+            var outSumA = 0
 
             for (i in -radius..radius) {
                 val p = pixels[y * w + min(w - 1, maxOf(i, 0))]
@@ -355,14 +419,20 @@ internal object StackBlur {
                 sir[2] = p and 0xff
                 sir[3] = (p ushr 24) and 0xff
                 val weight = radius + 1 - kotlin.math.abs(i)
-                sumR += sir[0] * weight; sumG += sir[1] * weight
-                sumB += sir[2] * weight; sumA += sir[3] * weight
+                sumR += sir[0] * weight
+                sumG += sir[1] * weight
+                sumB += sir[2] * weight
+                sumA += sir[3] * weight
                 if (i > 0) {
-                    inSumR += sir[0]; inSumG += sir[1]
-                    inSumB += sir[2]; inSumA += sir[3]
+                    inSumR += sir[0]
+                    inSumG += sir[1]
+                    inSumB += sir[2]
+                    inSumA += sir[3]
                 } else {
-                    outSumR += sir[0]; outSumG += sir[1]
-                    outSumB += sir[2]; outSumA += sir[3]
+                    outSumR += sir[0]
+                    outSumG += sir[1]
+                    outSumB += sir[2]
+                    outSumA += sir[3]
                 }
             }
 
@@ -370,64 +440,100 @@ internal object StackBlur {
             for (x in 0 until w) {
                 val idx = y * w + x
                 pixels[idx] = ((sumA / divSumSq).coerceIn(0, 255) shl 24) or
-                        ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
-                        ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
-                        (sumB / divSumSq).coerceIn(0, 255)
+                    ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
+                    ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
+                    (sumB / divSumSq).coerceIn(0, 255)
 
-                sumR -= outSumR; sumG -= outSumG
-                sumB -= outSumB; sumA -= outSumA
+                sumR -= outSumR
+                sumG -= outSumG
+                sumB -= outSumB
+                sumA -= outSumA
 
                 val si = (sp - radius + div) % div
                 val sir = stack[si]
-                outSumR -= sir[0]; outSumG -= sir[1]
-                outSumB -= sir[2]; outSumA -= sir[3]
+                outSumR -= sir[0]
+                outSumG -= sir[1]
+                outSumB -= sir[2]
+                outSumA -= sir[3]
 
                 if (y == 0) vMin[x] = min(x + radius + 1, w - 1)
                 val p = pixels[y * w + vMin[x]]
-                sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
-                sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
-                inSumR += sir[0]; inSumG += sir[1]
-                inSumB += sir[2]; inSumA += sir[3]
-                sumR += inSumR; sumG += inSumG
-                sumB += inSumB; sumA += inSumA
+                sir[0] = (p shr 16) and 0xff
+                sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff
+                sir[3] = (p ushr 24) and 0xff
+                inSumR += sir[0]
+                inSumG += sir[1]
+                inSumB += sir[2]
+                inSumA += sir[3]
+                sumR += inSumR
+                sumG += inSumG
+                sumB += inSumB
+                sumA += inSumA
 
                 sp = (sp + 1) % div
                 val sir2 = stack[sp]
-                outSumR += sir2[0]; outSumG += sir2[1]
-                outSumB += sir2[2]; outSumA += sir2[3]
-                inSumR -= sir2[0]; inSumG -= sir2[1]
-                inSumB -= sir2[2]; inSumA -= sir2[3]
+                outSumR += sir2[0]
+                outSumG += sir2[1]
+                outSumB += sir2[2]
+                outSumA += sir2[3]
+                inSumR -= sir2[0]
+                inSumG -= sir2[1]
+                inSumB -= sir2[2]
+                inSumA -= sir2[3]
             }
         }
     }
 
     private fun verticalPass(
-        pixels: IntArray, vMin: IntArray, w: Int, h: Int,
-        radius: Int, div: Int, divSumSq: Int,
+        pixels: IntArray,
+        vMin: IntArray,
+        w: Int,
+        h: Int,
+        radius: Int,
+        div: Int,
+        divSumSq: Int,
     ) {
         val stack = Array(div) { IntArray(4) }
 
         for (x in 0 until w) {
-            var sumR = 0; var sumG = 0; var sumB = 0; var sumA = 0
-            var inSumR = 0; var inSumG = 0; var inSumB = 0; var inSumA = 0
-            var outSumR = 0; var outSumG = 0; var outSumB = 0; var outSumA = 0
+            var sumR = 0
+            var sumG = 0
+            var sumB = 0
+            var sumA = 0
+            var inSumR = 0
+            var inSumG = 0
+            var inSumB = 0
+            var inSumA = 0
+            var outSumR = 0
+            var outSumG = 0
+            var outSumB = 0
+            var outSumA = 0
 
             for (i in -radius..radius) {
                 val yp = min(h - 1, maxOf(i, 0))
                 val idx = yp * w + x
                 val p = pixels[idx]
                 val sir = stack[i + radius]
-                sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
-                sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
+                sir[0] = (p shr 16) and 0xff
+                sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff
+                sir[3] = (p ushr 24) and 0xff
                 val weight = radius + 1 - kotlin.math.abs(i)
-                sumR += sir[0] * weight; sumG += sir[1] * weight
-                sumB += sir[2] * weight; sumA += sir[3] * weight
+                sumR += sir[0] * weight
+                sumG += sir[1] * weight
+                sumB += sir[2] * weight
+                sumA += sir[3] * weight
                 if (i > 0) {
-                    inSumR += sir[0]; inSumG += sir[1]
-                    inSumB += sir[2]; inSumA += sir[3]
+                    inSumR += sir[0]
+                    inSumG += sir[1]
+                    inSumB += sir[2]
+                    inSumA += sir[3]
                 } else {
-                    outSumR += sir[0]; outSumG += sir[1]
-                    outSumB += sir[2]; outSumA += sir[3]
+                    outSumR += sir[0]
+                    outSumG += sir[1]
+                    outSumB += sir[2]
+                    outSumA += sir[3]
                 }
             }
 
@@ -435,33 +541,47 @@ internal object StackBlur {
             for (y in 0 until h) {
                 val idx = y * w + x
                 pixels[idx] = ((sumA / divSumSq).coerceIn(0, 255) shl 24) or
-                        ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
-                        ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
-                        (sumB / divSumSq).coerceIn(0, 255)
+                    ((sumR / divSumSq).coerceIn(0, 255) shl 16) or
+                    ((sumG / divSumSq).coerceIn(0, 255) shl 8) or
+                    (sumB / divSumSq).coerceIn(0, 255)
 
-                sumR -= outSumR; sumG -= outSumG
-                sumB -= outSumB; sumA -= outSumA
+                sumR -= outSumR
+                sumG -= outSumG
+                sumB -= outSumB
+                sumA -= outSumA
                 val si = (sp - radius + div) % div
                 val sir = stack[si]
-                outSumR -= sir[0]; outSumG -= sir[1]
-                outSumB -= sir[2]; outSumA -= sir[3]
+                outSumR -= sir[0]
+                outSumG -= sir[1]
+                outSumB -= sir[2]
+                outSumA -= sir[3]
 
                 if (x == 0) vMin[y] = min(y + radius + 1, h - 1)
                 val idx2 = vMin[y] * w + x
                 val p = pixels[idx2]
-                sir[0] = (p shr 16) and 0xff; sir[1] = (p shr 8) and 0xff
-                sir[2] = p and 0xff; sir[3] = (p ushr 24) and 0xff
-                inSumR += sir[0]; inSumG += sir[1]
-                inSumB += sir[2]; inSumA += sir[3]
-                sumR += inSumR; sumG += inSumG
-                sumB += inSumB; sumA += inSumA
+                sir[0] = (p shr 16) and 0xff
+                sir[1] = (p shr 8) and 0xff
+                sir[2] = p and 0xff
+                sir[3] = (p ushr 24) and 0xff
+                inSumR += sir[0]
+                inSumG += sir[1]
+                inSumB += sir[2]
+                inSumA += sir[3]
+                sumR += inSumR
+                sumG += inSumG
+                sumB += inSumB
+                sumA += inSumA
 
                 sp = (sp + 1) % div
                 val sir2 = stack[sp]
-                outSumR += sir2[0]; outSumG += sir2[1]
-                outSumB += sir2[2]; outSumA += sir2[3]
-                inSumR -= sir2[0]; inSumG -= sir2[1]
-                inSumB -= sir2[2]; inSumA -= sir2[3]
+                outSumR += sir2[0]
+                outSumG += sir2[1]
+                outSumB += sir2[2]
+                outSumA += sir2[3]
+                inSumR -= sir2[0]
+                inSumG -= sir2[1]
+                inSumB -= sir2[2]
+                inSumA -= sir2[3]
             }
         }
     }

@@ -1,6 +1,8 @@
 package com.answufeng.image
 
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Scale
@@ -13,8 +15,7 @@ import java.util.UUID
 /**
  * [loadImage] 的 DSL 作用域，直接操作 Coil 的 [ImageRequest.Builder]。
  *
- * 相比旧版 `ImageLoadConfig`，`AwImageScope` 不创建中间配置对象，
- * 而是将 DSL 配置直接映射到 Coil Builder，减少对象分配。
+ * 将 DSL 配置直接映射到 Coil [ImageRequest.Builder]，不创建中间配置对象。
  *
  * ## 线程
  * 应在 **主线程** 上调用 [loadImage][com.answufeng.image.loadImage] 及其 DSL
@@ -49,7 +50,6 @@ class AwImageScope internal constructor(
      */
     internal val requestData: Any? = null,
 ) {
-
     private val transforms = mutableListOf<Transformation>()
     private var circleEnabled = false
     private var roundedRadius: FloatArray? = null
@@ -86,6 +86,7 @@ class AwImageScope internal constructor(
             retryOnError(result)
         }
     }
+
     internal var onProgressCallback: ((Long, Long) -> Unit)? = null
         private set
 
@@ -173,13 +174,19 @@ class AwImageScope internal constructor(
      * @param bottomRight 右下角半径
      * @param bottomLeft 左下角半径
      */
-    fun roundedCorners(topLeft: Float, topRight: Float, bottomRight: Float, bottomLeft: Float) {
-        roundedRadius = floatArrayOf(
-            topLeft.coerceAtLeast(0f),
-            topRight.coerceAtLeast(0f),
-            bottomRight.coerceAtLeast(0f),
-            bottomLeft.coerceAtLeast(0f),
-        )
+    fun roundedCorners(
+        topLeft: Float,
+        topRight: Float,
+        bottomRight: Float,
+        bottomLeft: Float,
+    ) {
+        roundedRadius =
+            floatArrayOf(
+                topLeft.coerceAtLeast(0f),
+                topRight.coerceAtLeast(0f),
+                bottomRight.coerceAtLeast(0f),
+                bottomLeft.coerceAtLeast(0f),
+            )
     }
 
     /**
@@ -189,7 +196,10 @@ class AwImageScope internal constructor(
      * @param height 高度，必须 > 0
      * @throws IllegalArgumentException 当 [width] 或 [height] 非正时
      */
-    fun override(width: Int, height: Int) {
+    fun override(
+        width: Int,
+        height: Int,
+    ) {
         require(width > 0 && height > 0) {
             "override width and height must be > 0, got ${width}x$height"
         }
@@ -197,7 +207,7 @@ class AwImageScope internal constructor(
     }
 
     /**
-     * 自定义内存缓存键（与 [com.answufeng.image.AwImage.isCached]、预加载的 `size`/变换配置需一致才能命中）。
+     * 自定义内存缓存键（与 [com.answufeng.image.AwImage.isCached]、预加载的 [override]/变换配置需一致才能命中）。
      * 映射 [ImageRequest.Builder.memoryCacheKey]。
      */
     fun memoryCacheKey(key: String?) {
@@ -222,10 +232,6 @@ class AwImageScope internal constructor(
         builder.diskCachePolicy(CachePolicy.DISABLED)
     }
 
-    /** @suppress 使用 [disableCache] 替代 */
-    @Deprecated("Use disableCache instead", ReplaceWith("disableCache()"))
-    fun noCache() = disableCache()
-
     /**
      * 设置离线时是否仅使用缓存（默认 true）。
      *
@@ -234,12 +240,6 @@ class AwImageScope internal constructor(
      * @param enabled 是否启用离线缓存，默认 true
      */
     fun offlineCacheEnabled(enabled: Boolean) {
-        offlineCacheEnabled = enabled
-    }
-
-    /** @suppress 使用 [offlineCacheEnabled] 替代 */
-    @Deprecated("Use offlineCacheEnabled instead", ReplaceWith("offlineCacheEnabled(enabled)"))
-    fun cacheOnlyOnOffline(enabled: Boolean) {
         offlineCacheEnabled = enabled
     }
 
@@ -280,14 +280,20 @@ class AwImageScope internal constructor(
     /**
      * 为本次网络请求增加 HTTP 头（CDN 鉴权、User-Agent 等）。映射 [ImageRequest.Builder.addHeader]。
      */
-    fun addHeader(name: String, value: String) {
+    fun addHeader(
+        name: String,
+        value: String,
+    ) {
         builder.addHeader(name, value)
     }
 
     /**
      * 设置/覆盖单条请求头。映射 [ImageRequest.Builder.setHeader]。
      */
-    fun setHeader(name: String, value: String) {
+    fun setHeader(
+        name: String,
+        value: String,
+    ) {
         builder.setHeader(name, value)
     }
 
@@ -412,7 +418,7 @@ class AwImageScope internal constructor(
     fun listener(
         onStart: (() -> Unit)? = null,
         onSuccess: ((coil.request.SuccessResult) -> Unit)? = null,
-        onError: ((coil.request.ErrorResult) -> Unit)? = null
+        onError: ((coil.request.ErrorResult) -> Unit)? = null,
     ) {
         onStart?.let { onStartCallback = it }
         onSuccess?.let { onSuccessCallback = it }
@@ -444,6 +450,22 @@ class AwImageScope internal constructor(
      */
     fun onProgress(action: (currentBytes: Long, totalBytes: Long) -> Unit) {
         onProgressCallback = action
+    }
+
+    /**
+     * 与 [onProgress] 相同约束，但回调固定派发到 **主线程**，便于直接更新 UI。
+     *
+     * 与 [onProgress] 互斥：后调用的会覆盖前者。
+     */
+    fun onProgressOnMainThread(action: (currentBytes: Long, totalBytes: Long) -> Unit) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        onProgressCallback = { current, total ->
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                action(current, total)
+            } else {
+                mainHandler.post { action(current, total) }
+            }
+        }
     }
 
     fun retry(count: Int) {

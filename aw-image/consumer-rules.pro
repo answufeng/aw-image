@@ -74,6 +74,7 @@
     public *** onSuccess(...);
     public *** onError(...);
     public *** onProgress(...);
+    public *** onProgressOnMainThread(...);
     public *** retry(...);
     public *** retryOnNetworkReconnect(...);
     public *** raw(...);
@@ -155,5 +156,5 @@
 
 -keepclassmembers class com.answufeng.image.AwImagePresets {
     public *** listThumbnail(...);
-    public *** avatar(...);
+    public *** avatarCircle(...);
 }

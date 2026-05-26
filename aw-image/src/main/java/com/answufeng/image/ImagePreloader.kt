@@ -22,45 +22,33 @@ import kotlinx.coroutines.withContext
  *
  * ```kotlin
  * lifecycleScope.launch {
- *     // 单张预加载
- *     val success: Boolean = ImagePreloader.preload(context, url)
- *
- *     // 批量预加载（返回每个 URL 的加载结果）
- *     val results: List<Boolean> = ImagePreloader.preloadAll(context, urls, concurrency = 8)
- *
- *     // 获取已缓存的 Drawable
- *     val drawable: Drawable? = ImagePreloader.getDrawable(context, url)
+ *     ImagePreloader.preload(context, url) { override(200, 200) }
+ *     ImagePreloader.preloadAll(context, urls, concurrency = 8) { override(200, 200) }
+ *     val drawable = ImagePreloader.getDrawable(context, url) { override(200, 200) }
  * }
  * ```
  *
- * 各方法可选的 `requestConfig` 与 [com.answufeng.image.loadImage] 中通过 DSL 对 `ImageRequest.Builder`
- * 所做的配置**语义一致**（`size`、请求头、变换等），以保证与列表展示命中同一缓存。
+ * [config] 与 [loadImage] 使用相同的 [AwImageScope] DSL（如 [AwImageScope.override]），
+ * 以保证与列表展示命中同一缓存。
  */
 object ImagePreloader {
-
     /**
      * 预加载单张图片到缓存。
      *
-     * 内部切换到 [kotlinx.coroutines.Dispatchers.IO] 执行。
-     *
-     * @param context Context
-     * @param data    图片数据源（URL / File / @DrawableRes 等）
-     * @param requestConfig 可选，对 [ImageRequest.Builder] 的配置（[ImageRequest.Builder.size]、
-     *  [ImageRequest.Builder.transformations] 等），应与 [com.answufeng.image.loadImage] 中实际加载
-     *  时一致，避免缓存键与展示请求不一致导致重复加载。
+     * @param config 与 [loadImage] 相同的 [AwImageScope] 配置（如 [AwImageScope.override]、变换等）
      * @return `true` 表示加载成功并已缓存，`false` 表示失败
      */
     @JvmSynthetic
     suspend fun preload(
         context: android.content.Context,
         data: Any,
-        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
+        config: (AwImageScope.() -> Unit)? = null,
     ): Boolean {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
                 val builder = ImageRequest.Builder(appContext).data(data)
-                requestConfig?.invoke(builder)
+                builder.applyAwImageScope(appContext, data, config)
                 val request = builder.build()
                 val result = Coil.imageLoader(appContext).execute(request)
                 val success = result is SuccessResult
@@ -73,31 +61,25 @@ object ImagePreloader {
     }
 
     /**
-     * 获取已缓存的图片 [Drawable]。
+     * 获取图片 [Drawable]；**未命中缓存时会发起网络/磁盘加载**。
      *
-     * 与 [preload] 不同，此方法返回 [Drawable] 对象，可直接设置到 ImageView。
-     * 如果未命中缓存，会触发加载；加载失败返回 null。
-     *
-     * 内部默认 `allowHardware(false)`，[requestConfig] 中可再覆盖以与业务一致。
-     *
-     * @param context Context
-     * @param data    图片数据源
-     * @param requestConfig 可选，[ImageRequest.Builder] 的额外配置（在 `data` 与 `allowHardware` 之后应用）。
-     * @return 已缓存的 [Drawable]，未命中缓存或加载失败时返回 null
+     * @param config 与 [loadImage] 相同的 [AwImageScope] 配置
+     * @return 成功时返回 [Drawable]，失败返回 null
      */
     @JvmSynthetic
     suspend fun getDrawable(
         context: android.content.Context,
         data: Any,
-        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
+        config: (AwImageScope.() -> Unit)? = null,
     ): Drawable? {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             runCatching {
-                val builder = ImageRequest.Builder(appContext)
-                    .data(data)
-                    .allowHardware(false)
-                requestConfig?.invoke(builder)
+                val builder =
+                    ImageRequest.Builder(appContext)
+                        .data(data)
+                        .allowHardware(false)
+                builder.applyAwImageScope(appContext, data, config)
                 val request = builder.build()
                 val result = Coil.imageLoader(appContext).execute(request)
                 (result as? SuccessResult)?.drawable
@@ -110,22 +92,16 @@ object ImagePreloader {
     /**
      * 批量预加载图片。
      *
-     * 使用 [Semaphore] 控制并发数，避免瞬间发起大量网络请求。
-     * 返回 `List<Boolean>` 表示每个 URL 的加载结果。
-     *
-     * @param context     Context
-     * @param urls        图片数据源列表
      * @param concurrency 最大并发数，默认 8
-     * @param requestConfig 可选，会应用到**每一张** [preload] 请求（如统一 [ImageRequest.Builder.size]）。
+     * @param config 应用到每一张预加载请求的配置
      * @return 每个数据源的加载结果列表（`true` = 成功）
-     * @throws IllegalArgumentException 如果 [concurrency] < 1
      */
     @JvmSynthetic
     suspend fun preloadAll(
         context: android.content.Context,
         urls: List<Any>,
         concurrency: Int = 8,
-        requestConfig: (ImageRequest.Builder.() -> Unit)? = null
+        config: (AwImageScope.() -> Unit)? = null,
     ): List<Boolean> {
         require(concurrency >= 1) { "concurrency must be >= 1, got $concurrency" }
         val appContext = context.applicationContext
@@ -136,7 +112,7 @@ object ImagePreloader {
                 async {
                     semaphore.acquire()
                     try {
-                        preload(appContext, url, requestConfig)
+                        preload(appContext, url, config)
                     } finally {
                         semaphore.release()
                     }

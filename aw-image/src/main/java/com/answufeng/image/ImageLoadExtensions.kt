@@ -1,6 +1,5 @@
 package com.answufeng.image
 
-import android.graphics.drawable.Drawable
 import android.util.TypedValue
 import android.widget.ImageView
 import androidx.lifecycle.Lifecycle
@@ -11,18 +10,19 @@ import coil.request.Disposable
 import coil.request.ImageRequest
 
 /**
- * 用于生命周期绑定的空 Disposable 占位对象。
- *
- * 当 data 为 null 时直接返回，避免触发 Coil 请求。
+ * Coil 2.x [Disposable.job] 为 [kotlinx.coroutines.Deferred]；须已结束以便 [bindLifecycle] 的 invokeOnCompletion 移除 observer。
+ * 当 data 为 null 时作为占位 [Disposable] 返回，避免触发 Coil 请求。
  */
-/** Coil 2.x [Disposable.job] 为 [kotlinx.coroutines.Deferred]；须已结束以便 [bindLifecycle] 的 invokeOnCompletion 移除 observer。 */
-private val EMPTY_DISPOSABLE = object : Disposable {
-    override val isDisposed get() = true
-    override val job = kotlinx.coroutines.CompletableDeferred<coil.request.ImageResult>().apply {
-        cancel()
+private val EMPTY_DISPOSABLE =
+    object : Disposable {
+        override val isDisposed get() = true
+        override val job =
+            kotlinx.coroutines.CompletableDeferred<coil.request.ImageResult>().apply {
+                cancel()
+            }
+
+        override fun dispose() {}
     }
-    override fun dispose() {}
-}
 
 /**
  * 将全局 crossfade 配置应用到 Coil Builder。
@@ -58,15 +58,16 @@ private fun bindLifecycle(
         }
         return
     }
-    val observer = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_DESTROY) {
-            onDestroy?.invoke()
-            if (!disposable.isDisposed) disposable.dispose()
-            if (progressToken != null && onProgress != null) {
-                ProgressInterceptor.unregister(progressToken, onProgress)
+    val observer =
+        LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_DESTROY) {
+                onDestroy?.invoke()
+                if (!disposable.isDisposed) disposable.dispose()
+                if (progressToken != null && onProgress != null) {
+                    ProgressInterceptor.unregister(progressToken, onProgress)
+                }
             }
         }
-    }
     owner.lifecycle.addObserver(observer)
     disposable.job.invokeOnCompletion {
         owner.lifecycle.removeObserver(observer)
@@ -80,7 +81,10 @@ private fun bindLifecycle(
  *        global fallback Drawable → global fallback Res →
  *        global error Drawable → global error Res → 清空 ImageView
  */
-private fun resolveFallback(imageView: ImageView, scope: AwImageScope?) {
+private fun resolveFallback(
+    imageView: ImageView,
+    scope: AwImageScope?,
+) {
     val fbDrawable = scope?.fallbackDrawable
     val fbRes = scope?.fallbackResId ?: 0
     when {
@@ -135,15 +139,16 @@ fun ImageView.loadImage(
     data: Any?,
     placeholderRes: Int = 0,
     errorRes: Int = 0,
-    config: (AwImageScope.() -> Unit)? = null
+    config: (AwImageScope.() -> Unit)? = null,
 ): Disposable {
     if (data == null) {
         AwImageLogger.d("loadImage: data is null, showing fallback/error")
-        val scope = if (config != null) {
-            AwImageScope(ImageRequest.Builder(context)).apply(config)
-        } else {
-            null
-        }
+        val scope =
+            if (config != null) {
+                AwImageScope(ImageRequest.Builder(context)).apply(config)
+            } else {
+                null
+            }
         resolveFallback(this, scope)
         return EMPTY_DISPOSABLE
     }
@@ -154,89 +159,103 @@ fun ImageView.loadImage(
     var lifecycleOwner: LifecycleOwner? = null
     var onProgress: ((Long, Long) -> Unit)? = null
     var progressToken: String? = null
+
     /** 在请求仍挂着「联网重试」监听时，随 Lifecycle 一并移除。 */
     var networkReconnectCleanup: (() -> Unit)? = null
 
-    val disposable = load(data) {
-        val phDrawable = AwImage.globalPlaceholderDrawable
-        val phRes = AwImage.globalPlaceholder
-        when {
-            placeholderRes != 0 -> placeholder(placeholderRes)
-            phDrawable != null -> placeholder(phDrawable)
-            phRes != 0 -> placeholder(phRes)
-        }
-
-        val errDrawable = AwImage.globalErrorDrawable
-        val errRes = AwImage.globalError
-        when {
-            errorRes != 0 -> error(errorRes)
-            errDrawable != null -> error(errDrawable)
-            errRes != 0 -> error(errRes)
-        }
-
-        if (config != null) {
-            val scope = AwImageScope(this, data)
-            scope.config()
-            if (!scope.isCrossfadeExplicitlySet) {
-                applyGlobalCrossfade()
+    val disposable =
+        load(data) {
+            val phDrawable = AwImage.globalPlaceholderDrawable
+            val phRes = AwImage.globalPlaceholder
+            when {
+                placeholderRes != 0 -> placeholder(placeholderRes)
+                phDrawable != null -> placeholder(phDrawable)
+                phRes != 0 -> placeholder(phRes)
             }
 
-            if (scope.retryCount > 0 || scope.retryOnNetworkReconnect) {
-                val iv = this@loadImage
-                val capturedData = data
-                val capturedPhRes = placeholderRes
-                val capturedErrRes = errorRes
-                val capturedConfig = config
-                val remaining = scope.retryCount
-                val retryOnReconnect = scope.retryOnNetworkReconnect
-                val reconnectListenerRef = arrayOfNulls<(Boolean) -> Unit>(1)
-                if (scope.retryOnNetworkReconnect) {
-                    networkReconnectCleanup = {
-                        reconnectListenerRef[0]?.let {
-                            ImageNetworkMonitor.removeOnConnectivityChangedListener(it)
-                        }
-                    }
+            val errDrawable = AwImage.globalErrorDrawable
+            val errRes = AwImage.globalError
+            when {
+                errorRes != 0 -> error(errorRes)
+                errDrawable != null -> error(errDrawable)
+                errRes != 0 -> error(errRes)
+            }
+
+            if (config != null) {
+                val scope = AwImageScope(this, data)
+                scope.config()
+                if (!scope.isCrossfadeExplicitlySet) {
+                    applyGlobalCrossfade()
                 }
-                scope.setRetryOnError { result ->
-                    if (remaining > 0) {
-                        AwImageLogger.d("loadImage: retrying ($remaining remaining) for $capturedData")
-                        iv.post {
-                            iv.loadImage(capturedData, capturedPhRes, capturedErrRes) {
-                                retry(remaining - 1)
-                                if (retryOnReconnect) retryOnNetworkReconnect()
-                                capturedConfig(this)
+
+                if (scope.retryCount > 0 || scope.retryOnNetworkReconnect) {
+                    val iv = this@loadImage
+                    val capturedData = data
+                    val capturedPhRes = placeholderRes
+                    val capturedErrRes = errorRes
+                    val capturedConfig = config
+                    val remaining = scope.retryCount
+                    val retryOnReconnect = scope.retryOnNetworkReconnect
+                    val reconnectListenerRef = arrayOfNulls<(Boolean) -> Unit>(1)
+                    if (scope.retryOnNetworkReconnect) {
+                        networkReconnectCleanup = {
+                            reconnectListenerRef[0]?.let {
+                                ImageNetworkMonitor.removeOnConnectivityChangedListener(it)
                             }
                         }
-                    } else if (retryOnReconnect) {
-                        val networkCallback: (Boolean) -> Unit = object : (Boolean) -> Unit {
-                            override fun invoke(connected: Boolean) {
-                                if (connected) {
-                                    ImageNetworkMonitor.removeOnConnectivityChangedListener(this)
-                                    iv.post {
-                                        iv.loadImage(capturedData, capturedPhRes, capturedErrRes) {
-                                            retry(0)
-                                            retryOnNetworkReconnect()
-                                            capturedConfig(this)
+                    }
+                    scope.setRetryOnError { result ->
+                        if (remaining > 0) {
+                            AwImageLogger.d("loadImage: retrying ($remaining remaining) for $capturedData")
+                            iv.post {
+                                iv.loadImage(capturedData, capturedPhRes, capturedErrRes) {
+                                    capturedConfig(this)
+                                    retry(remaining - 1)
+                                    if (retryOnReconnect) retryOnNetworkReconnect()
+                                }
+                            }
+                        } else if (retryOnReconnect) {
+                            val networkCallback: (Boolean) -> Unit =
+                                object : (Boolean) -> Unit {
+                                    override fun invoke(connected: Boolean) {
+                                        if (connected) {
+                                            ImageNetworkMonitor.removeOnConnectivityChangedListener(this)
+                                            iv.post {
+                                                iv.loadImage(capturedData, capturedPhRes, capturedErrRes) {
+                                                    capturedConfig(this)
+                                                    retry(0)
+                                                    if (retryOnReconnect) retryOnNetworkReconnect()
+                                                }
+                                            }
                                         }
                                     }
                                 }
-                            }
+                            reconnectListenerRef[0] = networkCallback
+                            ImageNetworkMonitor.addOnConnectivityChangedListener(networkCallback)
                         }
-                        reconnectListenerRef[0] = networkCallback
-                        ImageNetworkMonitor.addOnConnectivityChangedListener(networkCallback)
                     }
                 }
-            }
 
-            scope.registerProgressIfNeeded()
-            scope.applyTo(context)
-            tagValue = scope.tagValue
-            lifecycleOwner = scope.lifecycleOwner
-            onProgress = scope.onProgressCallback
-            progressToken = scope.progressToken
-        } else {
-            applyGlobalCrossfade()
+                scope.registerProgressIfNeeded()
+                scope.applyTo(context)
+                tagValue = scope.tagValue
+                lifecycleOwner = scope.lifecycleOwner ?: context.findLifecycleOwner()
+                onProgress = scope.onProgressCallback
+                progressToken = scope.progressToken
+                if (scope.retryOnNetworkReconnect && scope.lifecycleOwner == null && lifecycleOwner == null) {
+                    AwImageLogger.w(
+                        "loadImage: retryOnNetworkReconnect without lifecycle(); " +
+                            "call lifecycle(owner) or use Activity/Fragment Context",
+                    )
+                }
+            } else {
+                applyGlobalCrossfade()
+                lifecycleOwner = context.findLifecycleOwner()
+            }
         }
+
+    networkReconnectCleanup?.let { cleanup ->
+        disposable.job.invokeOnCompletion { cleanup() }
     }
 
     lifecycleOwner?.let { owner ->
@@ -261,6 +280,9 @@ fun ImageView.loadImage(
  *
  * 等价于 `loadImage(data) { circle() }`。
  *
+ * **注意**：绑定的 [ImageView] 显示区域须为 **1:1**（宽 = 高），
+ * 否则圆形变换会按矩形边界裁切，呈现上下平直的胶囊形。
+ *
  * @param data 图片数据源
  * @return [Disposable] 用于手动取消
  */
@@ -278,7 +300,10 @@ fun ImageView.loadCircle(data: Any?): Disposable {
  * @return [Disposable] 用于手动取消
  * @throws IllegalArgumentException 如果 [radiusPx] < 0
  */
-fun ImageView.loadRounded(data: Any?, radiusPx: Float): Disposable {
+fun ImageView.loadRounded(
+    data: Any?,
+    radiusPx: Float,
+): Disposable {
     require(radiusPx >= 0f) { "radiusPx must be >= 0, got $radiusPx" }
     return loadImage(data) { roundedCorners(radiusPx) }
 }
@@ -293,11 +318,17 @@ fun ImageView.loadRounded(data: Any?, radiusPx: Float): Disposable {
  * @return [Disposable] 用于手动取消
  * @throws IllegalArgumentException 如果 [radiusDp] < 0
  */
-fun ImageView.loadRoundedDp(data: Any?, radiusDp: Float): Disposable {
+fun ImageView.loadRoundedDp(
+    data: Any?,
+    radiusDp: Float,
+): Disposable {
     require(radiusDp >= 0f) { "radiusDp must be >= 0, got $radiusDp" }
-    val px = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP, radiusDp, context.resources.displayMetrics
-    )
+    val px =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            radiusDp,
+            context.resources.displayMetrics,
+        )
     return loadImage(data) { roundedCorners(px) }
 }
 
@@ -305,6 +336,8 @@ fun ImageView.loadRoundedDp(data: Any?, radiusDp: Float): Disposable {
  * 以圆形裁切+边框方式加载图片。
  *
  * 适用于头像等圆形带边框场景。
+ *
+ * **注意**：与 [loadCircle] 相同，[ImageView] 须为 **1:1** 显示区域。
  *
  * @param data         图片数据源
  * @param borderWidth  边框宽度（px），必须 > 0
@@ -315,11 +348,10 @@ fun ImageView.loadRoundedDp(data: Any?, radiusDp: Float): Disposable {
 fun ImageView.loadCircleWithBorder(
     data: Any?,
     borderWidth: Float = 4f,
-    borderColor: Int = android.graphics.Color.WHITE
+    borderColor: Int = android.graphics.Color.WHITE,
 ): Disposable {
     require(borderWidth > 0f) { "borderWidth must be > 0, got $borderWidth" }
     return loadImage(data) {
-        circle()
         transform(BorderTransformation(borderWidth, borderColor, circle = true))
     }
 }
@@ -334,7 +366,11 @@ fun ImageView.loadCircleWithBorder(
  * @param sampling 采样因子（≥1），默认 4
  * @return [Disposable] 用于手动取消
  */
-fun ImageView.loadBlur(data: Any?, radius: Int = 15, sampling: Int = 4): Disposable {
+fun ImageView.loadBlur(
+    data: Any?,
+    radius: Int = 15,
+    sampling: Int = 4,
+): Disposable {
     return loadImage(data) { transform(BlurTransformation(radius, sampling)) }
 }
 
@@ -351,7 +387,7 @@ fun ImageView.loadSquare(
     edgePx: Int,
     placeholderRes: Int = 0,
     errorRes: Int = 0,
-    config: (AwImageScope.() -> Unit)? = null
+    config: (AwImageScope.() -> Unit)? = null,
 ): Disposable {
     require(edgePx > 0) { "edgePx must be > 0, got $edgePx" }
     return loadImage(data, placeholderRes, errorRes) {
@@ -375,7 +411,7 @@ fun ImageView.loadWithAspectRatio(
     maxEdgePx: Int,
     placeholderRes: Int = 0,
     errorRes: Int = 0,
-    config: (AwImageScope.() -> Unit)? = null
+    config: (AwImageScope.() -> Unit)? = null,
 ): Disposable {
     require(aspectWidth > 0 && aspectHeight > 0) {
         "aspectWidth and aspectHeight must be > 0, got ${aspectWidth}x$aspectHeight"

@@ -1,83 +1,75 @@
 package com.answufeng.image.demo
 
-import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.LinearLayout
 import androidx.lifecycle.lifecycleScope
 import com.answufeng.image.AwImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class CacheActivity : AppCompatActivity() {
+class CacheActivity : DemoScaffoldActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_cache)
-        title = "缓存管理"
+    override fun demoTitle(): String = "缓存管理"
 
-        val tvResult = findViewById<TextView>(R.id.tvResult)
-        val tvMemSize = findViewById<TextView>(R.id.tvMemSize)
-        val tvDiskSize = findViewById<TextView>(R.id.tvDiskSize)
+    override fun LinearLayout.buildDemo() {
+        val memLine = addStatusLine("内存: …")
+        val diskLine = addStatusLine("磁盘: …")
+        val actionLine = addStatusLine("操作结果将显示在此处")
 
-        refreshCacheSizes(tvMemSize, tvDiskSize)
-
-        val focus = intent.getStringExtra("focus")
-
-        findViewById<Button>(R.id.btnClearMemory).setOnClickListener {
-            val result = AwImage.clearMemoryCache(this)
-            tvResult.text = "内存缓存已清除: $result"
-            refreshCacheSizes(tvMemSize, tvDiskSize)
-        }
-
-        findViewById<Button>(R.id.btnClearDisk).setOnClickListener {
+        fun refresh() {
+            memLine.text = "内存: ${formatSize(AwImage.getMemoryCacheSize(this@CacheActivity))}"
             lifecycleScope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    AwImage.clearDiskCache(this@CacheActivity)
+                val disk = withContext(Dispatchers.IO) {
+                    AwImage.getDiskCacheSize(this@CacheActivity)
                 }
-                tvResult.text = "磁盘缓存已清除: $result"
-                refreshCacheSizes(tvMemSize, tvDiskSize)
+                diskLine.text = "磁盘: ${formatSize(disk)}"
             }
         }
+        refresh()
 
-        when (focus) {
-            "memory" -> {
-                tvResult.text = "点击「清除内存缓存」按钮查看效果"
+        addSection(
+            title = "清理缓存",
+            subtitle = "AwImage.clearMemoryCache / clearDiskCache",
+        ) {
+            addPrimaryButton("清除内存缓存") {
+                val ok = AwImage.clearMemoryCache(this@CacheActivity)
+                actionLine.text = "clearMemoryCache: $ok"
+                refresh()
             }
-            "disk" -> {
-                tvResult.text = "点击「清除磁盘缓存」按钮查看效果"
-            }
-            "clear" -> {
+            addOutlinedButton("清除磁盘缓存") {
                 lifecycleScope.launch {
-                    val memResult = AwImage.clearMemoryCache(this@CacheActivity)
-                    val diskResult = withContext(Dispatchers.IO) {
+                    val ok = withContext(Dispatchers.IO) {
                         AwImage.clearDiskCache(this@CacheActivity)
                     }
-                    tvResult.text = "全部缓存已清除: 内存=$memResult, 磁盘=$diskResult"
-                    refreshCacheSizes(tvMemSize, tvDiskSize)
+                    actionLine.text = "clearDiskCache: $ok"
+                    refresh()
+                }
+            }
+            addOutlinedButton("全部清除") {
+                lifecycleScope.launch {
+                    val mem = AwImage.clearMemoryCache(this@CacheActivity)
+                    val disk = withContext(Dispatchers.IO) {
+                        AwImage.clearDiskCache(this@CacheActivity)
+                    }
+                    actionLine.text = "内存=$mem, 磁盘=$disk"
+                    refresh()
                 }
             }
         }
-    }
 
-    private fun refreshCacheSizes(tvMemSize: TextView, tvDiskSize: TextView) {
-        val memSize = AwImage.getMemoryCacheSize(this)
-        tvMemSize.text = "内存缓存: ${formatSize(memSize)}"
-
-        lifecycleScope.launch {
-            val diskSize = withContext(Dispatchers.IO) {
-                AwImage.getDiskCacheSize(this@CacheActivity)
-            }
-            tvDiskSize.text = "磁盘缓存: ${formatSize(diskSize)}"
+        addSection(
+            title = "低内存",
+            subtitle = "Application.onTrimMemory → AwImage.onApplicationTrimMemory",
+        ) {
+            addStatusLine(getString(R.string.cache_trim_memory_hint))
         }
     }
 
     private fun formatSize(bytes: Long): String {
         if (bytes <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB")
-        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
-            .coerceAtMost(units.size - 1)
-        return String.format("%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        val g = (kotlin.math.ln(bytes.toDouble()) / kotlin.math.ln(1024.0)).toInt()
+            .coerceIn(0, units.lastIndex)
+        return String.format("%.1f %s", bytes / Math.pow(1024.0, g.toDouble()), units[g])
     }
 }

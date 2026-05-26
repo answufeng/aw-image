@@ -12,7 +12,7 @@ extensions.configure<org.gradle.api.publish.PublishingExtension> {
             // JitPack 會用 `-Pversion=x.y.z` 傳入版本；本機/傳統流程則可能用 VERSION_NAME
             version = (findProperty("version")?.toString())
                 ?: (findProperty("VERSION_NAME")?.toString())
-                ?: "1.0.0"
+                ?: "1.1.0"
 
             pom {
                 name.set("aw-image")

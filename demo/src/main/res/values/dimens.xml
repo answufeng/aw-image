@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="demo_screen_h_padding">20dp</dimen>
+    <dimen name="demo_screen_v_padding">16dp</dimen>
+    <dimen name="demo_section_gap">20dp</dimen>
+    <dimen name="demo_image_height_large">220dp</dimen>
+    <dimen name="demo_image_height_medium">160dp</dimen>
+    <dimen name="demo_image_height_small">120dp</dimen>
+    <!-- loadCircle / loadCircleWithBorder 需 1:1 控件，否则圆形会被裁成胶囊形 -->
+    <dimen name="demo_image_square">128dp</dimen>
+</resources>

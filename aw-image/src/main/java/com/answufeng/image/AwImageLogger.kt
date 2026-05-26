@@ -8,7 +8,6 @@ import android.util.Log
  * release 中应保持关闭以免噪声与信息泄露（如 URL）。
  */
 object AwImageLogger {
-
     /** 是否启用日志输出 */
     @Volatile
     var enabled: Boolean = false
@@ -39,10 +38,20 @@ object AwImageLogger {
         if (enabled) Log.d(tag, message)
     }
 
-    fun e(message: String, throwable: Throwable? = null) {
+    fun w(message: String) {
+        if (enabled) Log.w(tag, message)
+    }
+
+    fun e(
+        message: String,
+        throwable: Throwable? = null,
+    ) {
         if (enabled) {
-            if (throwable != null) Log.e(tag, message, throwable)
-            else Log.e(tag, message)
+            if (throwable != null) {
+                Log.e(tag, message, throwable)
+            } else {
+                Log.e(tag, message)
+            }
         }
     }
 }

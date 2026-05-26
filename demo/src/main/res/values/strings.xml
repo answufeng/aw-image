@@ -4,4 +4,17 @@
     <string name="demo_playbook_title">演示清单</string>
     <string name="demo_playbook_message">入口与能力索引见仓库 demo/DEMO_MATRIX.md。\n\n• 基础加载 / 变换 / 列表 / 预加载\n• GIF / 缓存 / 集成示例\n\n缓存页说明与 README「内存与列表」一致。</string>
     <string name="cache_trim_memory_hint">系统内存紧张时会收到 onTrimMemory；可调用 AwImage.onTrimMemory(level) 或 clearMemoryCache。下方按钮用于手动验证清理效果，详见 README「内存与列表」。</string>
+    <string name="demo_image_content_desc">演示图片</string>
+    <string name="demo_home_title">AwImage 演示</string>
+    <string name="demo_home_subtitle">传统 XML + ImageView 场景下的加载、变换、列表、缓存与高级配置。网络演示需联网（picsum 等）；Drawable 项可用本地 img_test。点击下方条目进入对应演示。</string>
+    <string name="demo_rv_title">列表加载</string>
+    <string name="demo_rv_hint">每项使用 loadSquare(200) 限制解码尺寸；可切换列表/网格、预加载、按 tag 取消。</string>
+    <string name="demo_rv_toggle_grid">切换为网格</string>
+    <string name="demo_rv_toggle_list">切换为列表</string>
+    <string name="demo_rv_cancel">取消加载</string>
+    <string name="demo_rv_preload">预加载全部</string>
+    <string name="demo_rv_preload_done">预加载 %1$d/%2$d</string>
+    <string name="demo_rv_loading">加载中…</string>
+    <string name="demo_rv_ok">完成</string>
+    <string name="demo_rv_fail">失败</string>
 </resources>

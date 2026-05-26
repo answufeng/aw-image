@@ -1,176 +1,86 @@
 package com.answufeng.image.demo
 
+import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.os.Bundle
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import com.answufeng.image.*
+import com.answufeng.image.ColorFilterTransformation
+import com.answufeng.image.CropTransformation
+import com.answufeng.image.GrayscaleTransformation
+import com.answufeng.image.WatermarkTransformation
 
-class TransformActivity : AppCompatActivity() {
+class TransformActivity : DemoScaffoldActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    private val url = "https://picsum.photos/seed/aw-transform/800/500"
+    private val filterUrl = "https://picsum.photos/seed/aw-filter/800/600"
 
-        val focus = intent.getStringExtra("focus")
-        title = when (focus) {
-            "blur" -> "模糊变换"
-            "grayscale" -> "灰度变换"
-            else -> "图片变换"
-        }
+    override fun demoTitle(): String = "形状与变换"
 
-        val scrollView = ScrollView(this)
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
-        }
-
-        val url = "https://picsum.photos/400/300"
-
-        when (focus) {
-            "blur" -> setupBlurDemo(layout, url)
-            "grayscale" -> setupGrayscaleDemo(layout, url)
-            else -> setupFullDemo(layout, url)
-        }
-
-        scrollView.addView(layout)
-        setContentView(scrollView)
-    }
-
-    private fun setupFullDemo(layout: LinearLayout, url: String) {
-        layout.addView(createSectionLabel("原图"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 300).apply { topMargin = 12 }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            loadImage(url) { crossfade(false) }
-        })
-
-        layout.addView(createSectionLabel("圆角 (24px)"))
-        layout.addView(createComparisonRow(url, isRounded = true))
-
-        layout.addView(createSectionLabel("圆形"))
-        layout.addView(createComparisonRow(url, isCircle = true))
-
-        layout.addView(createSectionLabel("灰度"))
-        layout.addView(createComparisonRow(url, isGrayscale = true))
-
-        layout.addView(createSectionLabel("模糊"))
-        layout.addView(createComparisonRow(url, isBlur = true))
-
-        layout.addView(createSectionLabel("边框 (圆形 + 白色边框)"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(200, 200).apply { topMargin = 12 }
-            loadCircleWithBorder(url, borderWidth = 4f, borderColor = Color.WHITE)
-        })
-
-        layout.addView(createSectionLabel("颜色滤镜"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(200, 200).apply { topMargin = 12 }
-            loadImage(url) {
-                transform(ColorFilterTransformation(Color.parseColor("#80FF0000")))
+    override fun LinearLayout.buildDemo() {
+        addSection(
+            title = "快捷变换",
+            subtitle = "左右对照；网络失败回退 img_test",
+        ) {
+            addComparisonRow("圆角", url) { loadDemoRounded(url, 24f) }
+            addComparisonRow("圆形", url, square = true) { loadDemoCircle(url) }
+            addComparisonRow("灰度", url) {
+                loadDemoUrl(url) { transform(GrayscaleTransformation()) }
             }
-        })
-    }
-
-    private fun setupBlurDemo(layout: LinearLayout, url: String) {
-        layout.addView(createSectionLabel("原图"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 300).apply { topMargin = 12 }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            loadImage(url) { crossfade(false) }
-        })
-
-        layout.addView(createSectionLabel("模糊 (radius=10)"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 300).apply { topMargin = 12 }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            loadBlur(url, radius = 10)
-        })
-
-        layout.addView(createSectionLabel("模糊 (radius=20)"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 300).apply { topMargin = 12 }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            loadBlur(url, radius = 20)
-        })
-
-        layout.addView(createSectionLabel("模糊 (radius=25, sampling=2)"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 300).apply { topMargin = 12 }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            loadBlur(url, radius = 25, sampling = 2)
-        })
-    }
-
-    private fun setupGrayscaleDemo(layout: LinearLayout, url: String) {
-        layout.addView(createSectionLabel("原图"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(200, 200).apply { topMargin = 12 }
-            loadImage(url) { crossfade(false) }
-        })
-
-        layout.addView(createSectionLabel("灰度"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(200, 200).apply { topMargin = 12 }
-            loadImage(url) { transform(GrayscaleTransformation()) }
-        })
-
-        layout.addView(createSectionLabel("灰度 + 圆角"))
-        layout.addView(ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(200, 200).apply { topMargin = 12 }
-            loadImage(url) {
-                roundedCorners(16f)
-                transform(GrayscaleTransformation())
-            }
-        })
-    }
-
-    private fun createComparisonRow(
-        url: String,
-        isRounded: Boolean = false,
-        isCircle: Boolean = false,
-        isGrayscale: Boolean = false,
-        isBlur: Boolean = false
-    ): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 12 }
-
-            addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, 200).apply {
-                    weight = 1f
-                    marginEnd = 8
-                }
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                loadImage(url) { crossfade(false) }
-            })
-
-            addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, 200).apply {
-                    weight = 1f
-                }
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                when {
-                    isRounded -> loadRounded(url, 24f)
-                    isCircle -> loadCircle(url)
-                    isGrayscale -> loadImage(url) { transform(GrayscaleTransformation()) }
-                    isBlur -> loadBlur(url)
-                }
-            })
+            addComparisonRow("模糊", url) { loadDemoBlur(url, radius = 15, sampling = 4) }
         }
-    }
 
-    private fun createSectionLabel(text: String): TextView {
-        return TextView(this).apply {
-            this.text = text
-            textSize = 18f
-            setTextColor(Color.parseColor("#333333"))
-            setPadding(0, 28, 0, 4)
+        addSection(
+            title = "边框与色滤",
+            subtitle = "头像类常用效果",
+        ) {
+            addCaption("loadCircleWithBorder（1:1 槽位）")
+            addSquareImageSlot {
+                loadDemoCircleWithBorder(url, 4f, Color.WHITE)
+            }
+            addCaption("ColorFilterTransformation")
+            addImageSlot(R.dimen.demo_image_height_small) {
+                loadDemoUrl(url) {
+                    transform(ColorFilterTransformation(Color.parseColor("#66FF5722")))
+                }
+            }
+        }
+
+        addSection(
+            title = "滤镜对比",
+            subtitle = "同一 URL，不同 Transformation",
+        ) {
+            addCaption("原图")
+            addImageSlot { loadDemoUrl(filterUrl) }
+            addCaption("GrayscaleTransformation")
+            addImageSlot {
+                loadDemoUrl(filterUrl) { transform(GrayscaleTransformation()) }
+            }
+            addCaption("ColorFilterTransformation（怀旧）")
+            addImageSlot {
+                loadDemoUrl(filterUrl) { transform(ColorFilterTransformation(0x779E775C)) }
+            }
+            addCaption("BlurTransformation")
+            addImageSlot {
+                loadDemoBlur(filterUrl, radius = 15, sampling = 4)
+            }
+        }
+
+        addSection(
+            title = "裁切与水印",
+            subtitle = "CropTransformation / WatermarkTransformation",
+        ) {
+            addCaption("CropTransformation（中心区域）")
+            addImageSlot(R.dimen.demo_image_height_small) {
+                loadDemoUrl(url) {
+                    transform(CropTransformation(x = 200, y = 100, width = 400, height = 300))
+                }
+            }
+            val watermark = BitmapFactory.decodeResource(resources, R.drawable.img_test)
+            addCaption("WatermarkTransformation")
+            addImageSlot(R.dimen.demo_image_height_small) {
+                loadDemoUrl(url) {
+                    transform(WatermarkTransformation(watermark, x = 16, y = 16, alpha = 160))
+                }
+            }
         }
     }
 }

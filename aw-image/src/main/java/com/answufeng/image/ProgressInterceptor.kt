@@ -31,7 +31,6 @@ import java.util.concurrent.CopyOnWriteArrayList
  * @see Interceptor
  */
 internal object ProgressInterceptor : Interceptor {
-
     /**
      * 内部进度关联头；由 [AwImageScope.registerProgressIfNeeded] 写入并在 [intercept] 中剥离。
      */
@@ -39,7 +38,10 @@ internal object ProgressInterceptor : Interceptor {
 
     private val listeners = ConcurrentHashMap<String, CopyOnWriteArrayList<(Long, Long) -> Unit>>()
 
-    fun register(token: String, listener: (Long, Long) -> Unit) {
+    fun register(
+        token: String,
+        listener: (Long, Long) -> Unit,
+    ) {
         listeners.computeIfAbsent(token) { CopyOnWriteArrayList() }.add(listener)
     }
 
@@ -47,7 +49,10 @@ internal object ProgressInterceptor : Interceptor {
      * Removes [listener] for [token] (identity match). If no listeners remain, drops the entry.
      * Safe to call with a [listener] that was never registered.
      */
-    fun unregister(token: String, listener: (Long, Long) -> Unit) {
+    fun unregister(
+        token: String,
+        listener: (Long, Long) -> Unit,
+    ) {
         listeners.computeIfPresent(token) { _, list ->
             list.remove(listener)
             if (list.isEmpty()) null else list
@@ -57,15 +62,17 @@ internal object ProgressInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val token = request.header(PROGRESS_TOKEN_HEADER)
-        val forwardRequest = if (token != null) {
-            request.newBuilder().removeHeader(PROGRESS_TOKEN_HEADER).build()
-        } else {
-            request
-        }
+        val forwardRequest =
+            if (token != null) {
+                request.newBuilder().removeHeader(PROGRESS_TOKEN_HEADER).build()
+            } else {
+                request
+            }
         val response = chain.proceed(forwardRequest)
-        val callbackList = token?.let { tok ->
-            listeners[tok]?.let { ArrayList(it) }
-        }
+        val callbackList =
+            token?.let { tok ->
+                listeners[tok]?.let { ArrayList(it) }
+            }
         if (callbackList != null && callbackList.isNotEmpty()) {
             val body = response.body ?: return response
             val contentLength = body.contentLength()
@@ -74,15 +81,16 @@ internal object ProgressInterceptor : Interceptor {
                     l(c, t)
                 }
             }
-            val progressBody = object : ResponseBody() {
-                private val progressSource = ProgressSource(body.source(), contentLength, notify)
+            val progressBody =
+                object : ResponseBody() {
+                    private val progressSource = ProgressSource(body.source(), contentLength, notify)
 
-                override fun contentType() = body.contentType()
+                    override fun contentType() = body.contentType()
 
-                override fun contentLength() = contentLength
+                    override fun contentLength() = contentLength
 
-                override fun source(): BufferedSource = progressSource.buffer()
-            }
+                    override fun source(): BufferedSource = progressSource.buffer()
+                }
             return response.newBuilder().body(progressBody).build()
         }
         return response
@@ -91,13 +99,15 @@ internal object ProgressInterceptor : Interceptor {
     private class ProgressSource(
         delegate: Source,
         private val totalBytes: Long,
-        private val notify: (Long, Long) -> Unit
+        private val notify: (Long, Long) -> Unit,
     ) : ForwardingSource(delegate) {
-
         private var bytesRead = 0L
 
         @Throws(IOException::class)
-        override fun read(sink: Buffer, byteCount: Long): Long {
+        override fun read(
+            sink: Buffer,
+            byteCount: Long,
+        ): Long {
             val bytesRead = super.read(sink, byteCount)
             if (bytesRead != -1L) {
                 this.bytesRead += bytesRead

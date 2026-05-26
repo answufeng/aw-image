@@ -22,7 +22,6 @@ import android.net.NetworkCapabilities
  * 首次调用 [isConnected] 时自动注册回调，后续调用直接读取缓存值。
  */
 internal object ImageNetworkMonitor {
-
     @Volatile
     internal var isStrictNetworkForOffline: Boolean = true
 
@@ -68,32 +67,36 @@ internal object ImageNetworkMonitor {
         synchronized(this) {
             if (registered) return
             val appContext = context.applicationContext
-            val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
-                as? ConnectivityManager ?: return
+            val cm =
+                appContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+                    as? ConnectivityManager ?: return
             connected = queryCurrentState(cm)
-            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    val caps = cm.getNetworkCapabilities(network)
-                    val nowConnected = caps != null && hasUsableInternet(caps)
-                    connected = nowConnected
-                    if (nowConnected) {
-                        for (l in connectivityListeners) l.invoke(true)
+            cm.registerDefaultNetworkCallback(
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        val caps = cm.getNetworkCapabilities(network)
+                        val nowConnected = caps != null && hasUsableInternet(caps)
+                        connected = nowConnected
+                        if (nowConnected) {
+                            for (l in connectivityListeners) l.invoke(true)
+                        }
                     }
-                }
 
-                override fun onLost(network: Network) {
-                    connected = false
-                    for (l in connectivityListeners) l.invoke(false)
-                }
+                    override fun onLost(network: Network) {
+                        connected = false
+                        for (l in connectivityListeners) l.invoke(false)
+                    }
 
-                override fun onCapabilitiesChanged(
-                    network: Network, caps: NetworkCapabilities
-                ) {
-                    val nowConnected = hasUsableInternet(caps)
-                    connected = nowConnected
-                    for (l in connectivityListeners) l.invoke(nowConnected)
-                }
-            })
+                    override fun onCapabilitiesChanged(
+                        network: Network,
+                        caps: NetworkCapabilities,
+                    ) {
+                        val nowConnected = hasUsableInternet(caps)
+                        connected = nowConnected
+                        for (l in connectivityListeners) l.invoke(nowConnected)
+                    }
+                },
+            )
             registered = true
         }
     }

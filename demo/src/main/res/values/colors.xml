@@ -1,34 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Legacy aliases (keep for compatibility) -->
-    <color name="colorPrimary">#FF1E293B</color>
-    <color name="colorPrimaryDark">#FF0F172A</color>
-    <color name="colorAccent">#FF22C55E</color>
-    <color name="textPrimary">#FF0F172A</color>
-    <color name="textSecondary">#FF475569</color>
-    <color name="background">#FFF8FAFC</color>
+    <color name="colorPrimary">#FF2563EB</color>
+    <color name="colorPrimaryDark">#FF1D4ED8</color>
+    <color name="colorAccent">#FF2563EB</color>
+
+    <color name="primary">#FF2563EB</color>
+    <color name="primary_variant">#FF1D4ED8</color>
+    <color name="primary_container">#FFDBEAFE</color>
+    <color name="secondary">#FF64748B</color>
+    <color name="secondary_variant">#FF475569</color>
+    <color name="tertiary">#FF0EA5E9</color>
+
+    <color name="background">#FFF1F5F9</color>
     <color name="surface">#FFFFFFFF</color>
-    <color name="divider">#FFE2E8F0</color>
-    
-    <!-- Material Design colors -->
-    <color name="primary">#FF1E293B</color>
-    <color name="primary_variant">#FF0F172A</color>
-    <color name="secondary">#FF334155</color>
-    <color name="secondary_variant">#FF1E293B</color>
-    <color name="tertiary">#FF22C55E</color>
-    
-    <!-- Card colors -->
-    <color name="card_background">#FFFFFFFF</color>
-    <color name="card_border">#FFE2E8F0</color>
-    
-    <!-- Image colors -->
-    <color name="image_background">#FFF1F5F9</color>
-    
-    <!-- Material Design 3 on_* colors -->
+    <color name="surface_variant">#FFE2E8F0</color>
+
+    <color name="textPrimary">#FF0F172A</color>
+    <color name="textSecondary">#FF64748B</color>
     <color name="on_primary">#FFFFFFFF</color>
     <color name="on_surface">#FF0F172A</color>
-    <color name="on_surface_variant">#FF475569</color>
-    
-    <!-- Error color -->
+    <color name="on_surface_variant">#FF64748B</color>
+    <color name="on_primary_container">#FF1E3A8A</color>
+
+    <color name="card_background">#FFFFFFFF</color>
+    <color name="card_border">#FFE2E8F0</color>
+    <color name="divider">#FFE2E8F0</color>
     <color name="error">#FFDC2626</color>
+    <color name="success">#FF16A34A</color>
 </resources>
